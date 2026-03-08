@@ -1,0 +1,33 @@
+{
+  "model": "claude-sonnet-4-6",
+  "permissions": {
+    "allow": [
+      "Bash(bun install)",
+      "Bash(bun add:*)",
+      "Bash(bun remove:*)",
+      "Bash(bun run test)",
+      "Bash(bun run test:*)",
+      "Bash(bun run mock)",
+      "Bash(bun run mock:verbose)",
+      "Bash(bun run format)",
+      "Bash(bun run format:check)",
+      "Bash(bun run generate:bru)",
+      "Bash(bun run codegen)",
+      "Bash(bunx bddgen)",
+      "Bash(bunx bddgen:*)",
+      "Bash(bunx playwright:*)",
+      "Bash(bunx playwright install:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "mcp__ide__getDiagnostics"
+    ],
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(rm -rf:*)"
+    ]
+  }
+}

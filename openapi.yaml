@@ -1,0 +1,118 @@
+openapi: 3.0.3
+info:
+  title: BDD Template API
+  version: 1.0.0
+  description: API spec สำหรับใช้ mock ด้วย Prism และ generate Bruno collection
+
+servers:
+  - url: http://localhost:4010
+    description: Prism mock server
+
+paths:
+  /api/users:
+    get:
+      summary: ดึงรายการ users ทั้งหมด
+      operationId: getUsers
+      responses:
+        '200':
+          description: สำเร็จ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+              example:
+                - id: 1
+                  username: alice
+                  email: alice@example.com
+                - id: 2
+                  username: bob
+                  email: bob@example.com
+
+    post:
+      summary: สร้าง user ใหม่
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserInput'
+            example:
+              username: alice
+              email: alice@example.com
+      responses:
+        '201':
+          description: สร้างสำเร็จ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: 3
+                username: alice
+                email: alice@example.com
+        '400':
+          description: ข้อมูลไม่ถูกต้อง
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/users/{id}:
+    get:
+      summary: ดึงข้อมูล user ตาม id
+      operationId: getUserById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: สำเร็จ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: 1
+                username: alice
+                email: alice@example.com
+        '404':
+          description: ไม่พบ user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    User:
+      type: object
+      required: [id, username, email]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+
+    CreateUserInput:
+      type: object
+      required: [username, email]
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string

@@ -1,0 +1,26 @@
+{
+  "name": "bdd",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "codegen": "playwright codegen",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "mock": "prism mock openapi.yaml --port 4010",
+    "mock:verbose": "prism mock openapi.yaml --port 4010 --log-level debug",
+    "generate:bru": "bun run scripts/generate-bru.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@stoplight/prism-cli": "^5.14.2",
+    "@types/bun": "latest",
+    "playwright-bdd": "^8.4.2",
+    "prettier": "^3.8.1",
+    "prettier-plugin-gherkin": "^3.1.3"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

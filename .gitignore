@@ -1,0 +1,27 @@
+# dependencies
+node_modules
+
+# dotenv — copy from .env.example, never commit real credentials
+.env
+.env.*.local
+
+# Playwright — auto-generated, do not commit
+.features-gen/
+test-results/
+playwright-report/
+
+# Build / output
+out
+dist
+*.tgz
+*.tsbuildinfo
+
+# Logs
+*.log
+
+# Editor
+.idea
+.vscode
+
+# macOS
+.DS_Store
