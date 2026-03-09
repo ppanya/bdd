@@ -5,6 +5,12 @@
  * รองรับ success, failed, และ edge case scenarios
  *
  * รัน: bun run generate:bru
+ * รัน (พร้อม merge overrides): bun run generate:bru -- --merge
+ *
+ * Override system:
+ *   base:     01-get-api-users-200.bru           ← auto-generated (safe to regenerate)
+ *   override: 01-get-api-users-200.override.bru  ← manual edits (NEVER overwritten)
+ *   merged:   01-get-api-users-200.merged.bru    ← optional: --merge flag
  *
  * รูปแบบ step ที่รองรับ:
  *   When ฉันเรียก GET "/api/users"
@@ -16,12 +22,16 @@
 
 import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, basename } from 'node:path';
+import { existsSync } from 'node:fs';
 
 const FEATURES_DIR = join(import.meta.dir, '../features/api');
 const BRUNO_DIR = join(import.meta.dir, '../bruno');
 
 const HTTP_STEP_REGEX = /ฉันเรียก (GET|POST|PUT|PATCH|DELETE) "([^"]+)"/i;
 const STATUS_STEP_REGEX = /status code ควรเป็น (\d+)/;
+
+// ── CLI flags ─────────────────────────────────────────────────────────────────
+const mergeMode = process.argv.includes('--merge');
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -31,8 +41,18 @@ interface ParsedRequest {
   scenarioName: string;
   hasBody: boolean;
   tableHeaders: string[];
-  expectedStatus: number | null; // null = ยังไม่รู้
+  expectedStatus: number | null;
 }
+
+// ── BRU section names that can be overridden ──────────────────────────────────
+type BruSection =
+  | 'meta'
+  | 'get' | 'post' | 'put' | 'patch' | 'delete'
+  | 'headers'
+  | 'body:json'
+  | 'tests'
+  | 'script:pre-request'
+  | 'script:post-response';
 
 function methodToSeq(method: HttpMethod): number {
   return { GET: 1, POST: 2, PUT: 3, PATCH: 4, DELETE: 5 }[method];
@@ -77,6 +97,48 @@ ${buildStatusAssertion(req.expectedStatus)}
 `;
 }
 
+// ── Override / Merge logic ────────────────────────────────────────────────────
+
+/**
+ * parseBruSections — แยก .bru file ออกเป็น map ของ section name → content
+ *
+ * รูปแบบ:
+ *   sectionName {
+ *     ...content...
+ *   }
+ */
+function parseBruSections(content: string): Map<string, string> {
+  const sections = new Map<string, string>();
+  const sectionRegex = /^([\w:]+)\s*\{([^}]*)\}/gms;
+  let match;
+  while ((match = sectionRegex.exec(content)) !== null) {
+    const name = match[1]!.trim() as BruSection;
+    const body = match[2]!;
+    sections.set(name, body);
+  }
+  return sections;
+}
+
+/**
+ * mergeBruContents — overlay override sections on top of base sections
+ * Override สามารถ replace section ที่มีอยู่แล้ว หรือเพิ่ม section ใหม่ก็ได้
+ */
+function mergeBruContents(base: string, override: string): string {
+  const baseSections = parseBruSections(base);
+  const overrideSections = parseBruSections(override);
+
+  // Override replaces matching sections; adds new sections
+  for (const [name, body] of overrideSections) {
+    baseSections.set(name, body);
+  }
+
+  return [...baseSections.entries()]
+    .map(([name, body]) => `${name} {${body}}`)
+    .join('\n\n');
+}
+
+// ── Feature parser ────────────────────────────────────────────────────────────
+
 async function parseFeatureFile(filePath: string): Promise<ParsedRequest[]> {
   const content = await readFile(filePath, 'utf-8');
   const lines = content.split('\n');
@@ -107,7 +169,6 @@ async function parseFeatureFile(filePath: string): Promise<ParsedRequest[]> {
 
     const httpMatch = trimmed.match(HTTP_STEP_REGEX);
     if (httpMatch) {
-      // scenario นี้มี HTTP call หลายอัน — flush ก่อน
       flushPending();
       tableHeaders = [];
       pendingRequest = {
@@ -121,14 +182,12 @@ async function parseFeatureFile(filePath: string): Promise<ParsedRequest[]> {
       continue;
     }
 
-    // จับ expected status code จาก Then step
     const statusMatch = trimmed.match(STATUS_STEP_REGEX);
     if (statusMatch && pendingRequest) {
       pendingRequest.expectedStatus = parseInt(statusMatch[1]!, 10);
       continue;
     }
 
-    // อ่าน table header row (บรรทัดแรกของ DataTable)
     if (collectingTable && trimmed.startsWith('|') && tableHeaders.length === 0) {
       tableHeaders = trimmed
         .split('|')
@@ -142,6 +201,8 @@ async function parseFeatureFile(filePath: string): Promise<ParsedRequest[]> {
   return requests;
 }
 
+// ── Main ──────────────────────────────────────────────────────────────────────
+
 async function run() {
   const featureFiles = (await readdir(FEATURES_DIR)).filter((f) => f.endsWith('.feature'));
 
@@ -150,7 +211,13 @@ async function run() {
     process.exit(0);
   }
 
+  if (mergeMode) {
+    console.log('🔀 Merge mode: จะสร้าง *.merged.bru จาก base + override\n');
+  }
+
   let totalGenerated = 0;
+  let totalPreserved = 0;
+  let totalMerged = 0;
 
   for (const featureFile of featureFiles) {
     const featurePath = join(FEATURES_DIR, featureFile);
@@ -161,7 +228,6 @@ async function run() {
 
     const requests = await parseFeatureFile(featurePath);
 
-    // จัดเรียงตาม method (GET → POST → PUT → PATCH → DELETE) แล้วตาม expected status
     requests.sort((a, b) => {
       const seqDiff = methodToSeq(a.method) - methodToSeq(b.method);
       if (seqDiff !== 0) return seqDiff;
@@ -175,17 +241,42 @@ async function run() {
         .replace(/\//g, '-')
         .replace(/[^\w-]/g, '-');
       const statusTag = req.expectedStatus ? `-${req.expectedStatus}` : '';
-      const filename = `${String(i + 1).padStart(2, '0')}-${req.method.toLowerCase()}-${pathSlug}${statusTag}.bru`;
-      const outputPath = join(outputDir, filename);
-      const content = buildBruContent(req, i + 1);
+      const baseName = `${String(i + 1).padStart(2, '0')}-${req.method.toLowerCase()}-${pathSlug}${statusTag}`;
+      const baseFile = `${baseName}.bru`;
+      const overrideFile = `${baseName}.override.bru`;
+      const mergedFile = `${baseName}.merged.bru`;
 
-      await writeFile(outputPath, content, 'utf-8');
-      console.log(`✓ ${filename}  (expect: ${req.expectedStatus ?? 'any'})`);
+      const basePath = join(outputDir, baseFile);
+      const overridePath = join(outputDir, overrideFile);
+      const mergedPath = join(outputDir, mergedFile);
+
+      const baseContent = buildBruContent(req, i + 1);
+
+      // Check for existing override — NEVER touch it
+      if (existsSync(overridePath)) {
+        console.log(`⚠ override exists: ${overrideFile} (preserved)`);
+        totalPreserved++;
+      }
+
+      // Write base file (always regenerate)
+      await writeFile(basePath, baseContent, 'utf-8');
+      console.log(`✓ ${baseFile}  (expect: ${req.expectedStatus ?? 'any'})`);
       totalGenerated++;
+
+      // Merge mode: produce *.merged.bru
+      if (mergeMode && existsSync(overridePath)) {
+        const overrideContent = await readFile(overridePath, 'utf-8');
+        const merged = mergeBruContents(baseContent, overrideContent);
+        await writeFile(mergedPath, merged, 'utf-8');
+        console.log(`  → merged: ${mergedFile}`);
+        totalMerged++;
+      }
     }
   }
 
   console.log(`\nสรุป: สร้างไฟล์ .bru ทั้งหมด ${totalGenerated} ไฟล์`);
+  if (totalPreserved > 0) console.log(`       ข้าม override ${totalPreserved} ไฟล์ (preserved)`);
+  if (totalMerged > 0)   console.log(`       สร้าง merged ${totalMerged} ไฟล์`);
 }
 
 run().catch((err) => {

@@ -1,19 +1,21 @@
-import type { Locator, Page } from '@playwright/test';
-
+/**
+ * LoginPage — WDIO Page Object
+ * ใช้ getter แทน constructor assignment เพื่อ lazy-resolve element ทุกครั้งที่ใช้
+ */
 export class LoginPage {
-  readonly usernameInput: Locator;
-  readonly passwordInput: Locator;
+  get usernameInput() {
+    return $('#username');
+  }
 
-  constructor(page: Page) {
-    this.usernameInput = page.locator('#username');
-    this.passwordInput = page.locator('#password');
+  get passwordInput() {
+    return $('#password');
   }
 
   async fillUsername(username: string) {
-    await this.usernameInput.fill(username);
+    await this.usernameInput.setValue(username);
   }
 
   async fillPassword(password: string) {
-    await this.passwordInput.fill(password);
+    await this.passwordInput.setValue(password);
   }
 }

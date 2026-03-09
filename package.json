@@ -3,22 +3,38 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "playwright test",
-    "test:ui": "playwright test --ui",
-    "codegen": "playwright codegen",
+    "test": "npx wdio run wdio.conf.ts",
+    "test:web": "npx wdio run wdio.conf.ts --suite web",
+    "test:api": "npx wdio run wdio.conf.ts --suite api",
+    "test:mobile:android": "MOBILE_PLATFORM=android npx wdio run wdio.conf.ts --suite mobile",
+    "test:mobile:ios": "MOBILE_PLATFORM=ios npx wdio run wdio.conf.ts --suite mobile",
+    "mock": "bunx @stoplight/prism-cli mock openapi.yaml --port 4010 --host 0.0.0.0",
+    "mock:test": "bun run mock & sleep 3 && bun run test:api; kill %1",
+    "setup:m-series": "sh scripts/setup-m-series.sh",
+    "report:checklist": "open reports/living-checklist.html",
+    "generate:bru": "bun scripts/generate-bru.ts",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "mock": "prism mock openapi.yaml --port 4010",
-    "mock:verbose": "prism mock openapi.yaml --port 4010 --log-level debug",
-    "generate:bru": "bun run scripts/generate-bru.ts"
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
+    "@cucumber/cucumber": "^11.0.0",
     "@stoplight/prism-cli": "^5.14.2",
     "@types/bun": "latest",
-    "playwright-bdd": "^8.4.2",
+    "@types/node": "^22.0.0",
+    "@wdio/allure-reporter": "^9.0.0",
+    "@wdio/appium-service": "^9.0.0",
+    "@wdio/cli": "^9.0.0",
+    "@wdio/cucumber-framework": "^9.0.0",
+    "@wdio/globals": "^9.0.0",
+    "@wdio/local-runner": "^9.0.0",
+    "@wdio/reporter": "^9.0.0",
+    "@wdio/spec-reporter": "^9.0.0",
+    "@wdio/types": "^9.0.0",
+    "appium": "^2.0.0",
+    "expect-webdriverio": "^5.0.0",
     "prettier": "^3.8.1",
-    "prettier-plugin-gherkin": "^3.1.3"
+    "prettier-plugin-gherkin": "^3.1.3",
+    "ts-node": "^10.9.2"
   },
   "peerDependencies": {
     "typescript": "^5"

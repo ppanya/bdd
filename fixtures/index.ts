@@ -1,43 +1,58 @@
-import { test as base, createBdd } from 'playwright-bdd';
-import { request } from '@playwright/test';
-import type { APIResponse } from '@playwright/test';
-
 /**
- * AppFixtures — custom fixtures ที่ใช้ร่วมกันทุก step file
+ * fixtures/index.ts — WDIO + Cucumber World
  *
- * apiContext : Playwright APIRequestContext พร้อม baseURL + headers
- * world      : object สำหรับเก็บ state ระหว่าง steps ของ scenario เดียวกัน
- *              (เหมือน "World" ใน Cucumber) — ปลอดภัยกว่า module-level variable
- *              เพราะ Playwright สร้าง instance ใหม่ให้ทุก scenario อัตโนมัติ
+ * แทน playwright-bdd fixtures ด้วย Cucumber World class
+ * ทุก scenario จะได้ instance ใหม่ของ AppWorld โดยอัตโนมัติ
+ *
+ * Step files ใช้ `this` เพื่อเข้าถึง world:
+ *   Given('step', async function(this: AppWorld) { this.lastResponse ... })
  */
-export type AppFixtures = {
-  apiContext: Awaited<ReturnType<typeof request.newContext>>;
-  world: {
-    lastResponse: APIResponse | null;
-    // preferCode: ใช้กับ Prism mock เพื่อบังคับให้ return status code ที่ต้องการ
-    // ตั้งค่าด้วย step "Given ทดสอบ error case ด้วย status {int}"
-    preferCode: number | null;
-  };
-};
 
-export const test = base.extend<AppFixtures>({
-  apiContext: async ({}, use) => {
-    const context = await request.newContext({
-      baseURL: process.env.API_BASE_URL ?? 'http://localhost:4010',
-      extraHTTPHeaders: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
-    await use(context);
-    await context.dispose();
-  },
+import { setWorldConstructor, World, Before, After, setDefaultTimeout } from '@cucumber/cucumber';
+import type { IWorldOptions } from '@cucumber/cucumber';
 
-  world: async ({}, use) => {
-    // สร้างใหม่ทุก scenario — ไม่มี shared state ระหว่าง scenarios
-    await use({ lastResponse: null, preferCode: null });
-  },
+// ── World type ────────────────────────────────────────────────────────────────
+
+export class AppWorld extends World {
+  /** Response ล่าสุดจาก API call — reset ทุก scenario */
+  lastResponse: Response | null = null;
+
+  /**
+   * preferCode: ส่ง header `Prefer: code=XXX` ไปยัง Prism mock
+   * เพื่อบังคับให้ return status code ที่ต้องการ
+   * Set ด้วย step "Given ทดสอบ error case ด้วย status {int}"
+   */
+  preferCode: number | null = null;
+
+  constructor(options: IWorldOptions) {
+    super(options);
+  }
+
+  /** Reset world state — ใช้ใน Before hook */
+  reset() {
+    this.lastResponse = null;
+    this.preferCode = null;
+  }
+}
+
+setWorldConstructor(AppWorld);
+
+// ── Hooks ─────────────────────────────────────────────────────────────────────
+
+setDefaultTimeout(60_000);
+
+Before(async function (this: AppWorld) {
+  this.reset();
 });
 
-// step files ทั้งหมด import Given/When/Then จากที่นี่ที่เดียว
-export const { Given, When, Then } = createBdd(test);
+After(async function (this: AppWorld, scenario) {
+  // ถ่าย screenshot เมื่อ test fail (web suite เท่านั้น — browser global available)
+  if (scenario.result?.status === 'FAILED') {
+    try {
+      const screenshot = await browser.takeScreenshot();
+      await this.attach(screenshot, 'image/png');
+    } catch {
+      // browser อาจไม่ถูกเปิด (เช่น API suite) — ไม่ต้อง throw
+    }
+  }
+});

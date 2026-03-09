@@ -1,7 +1,7 @@
-# BDD Automation Template
+# BDD Automation Framework
 
-Template สำหรับสอน QA เริ่มต้นทำ **Behavior-Driven Development (BDD)**
-ครอบคลุม automated test ทั้ง **UI** และ **API** พร้อม mock server และ API documentation
+Framework สำหรับ **Behavior-Driven Development (BDD)** ครอบคลุม Web UI, API, และ Mobile (Flutter)
+ภายใต้ runner เดียว พร้อม mock server, API collection, และ living checklist report
 
 ---
 
@@ -17,15 +17,17 @@ Template สำหรับสอน QA เริ่มต้นทำ **Behavio
 8. [Environment Variables](#environment-variables)
 9. [เขียน Feature File](#เขียน-feature-file)
 10. [เขียน Step Definitions](#เขียน-step-definitions)
-11. [Page Object Model](#page-object-model)
+11. [Page & Screen Objects](#page--screen-objects)
 12. [API Testing](#api-testing)
-13. [Fixtures และ World](#fixtures-และ-world)
-14. [Mock API ด้วย Prism](#mock-api-ด้วย-prism)
-15. [Bruno API Collection](#bruno-api-collection)
-16. [Config Files อธิบาย](#config-files-อธิบาย)
-17. [ดู Test Results](#ดู-test-results)
-18. [เพิ่ม Feature ใหม่](#เพิ่ม-feature-ใหม่)
-19. [Common Mistakes](#common-mistakes)
+13. [Mobile Testing](#mobile-testing)
+14. [Cucumber World](#cucumber-world)
+15. [Mock API ด้วย Prism](#mock-api-ด้วย-prism)
+16. [Bruno API Collection](#bruno-api-collection)
+17. [Living Checklist Reporter](#living-checklist-reporter)
+18. [Config Files อธิบาย](#config-files-อธิบาย)
+19. [ดู Test Results](#ดู-test-results)
+20. [เพิ่ม Feature ใหม่](#เพิ่ม-feature-ใหม่)
+21. [Common Mistakes](#common-mistakes)
 
 ---
 
@@ -49,37 +51,49 @@ Feature: ระบบ Login
 
 ### ทำไม BDD?
 
-| ปัญหาเดิม                                      | BDD แก้ด้วย                                   |
-| ---------------------------------------------- | --------------------------------------------- |
-| QA เขียน test เสร็จแล้ว Dev ไม่รู้ว่าทดสอบอะไร | Feature file เป็น shared language ทั้งทีม     |
-| Test ล้าสมัย ไม่ตรงกับ requirement จริง        | Feature file = requirement = test ในไฟล์เดียว |
-| หา bug ยาก ไม่รู้ว่า flow ไหนพัง               | Scenario ชัดเจน อ่านแล้วรู้ทันทีว่าพังตรงไหน  |
+| ปัญหาเดิม | BDD แก้ด้วย |
+|-----------|------------|
+| QA เขียน test เสร็จแล้ว Dev ไม่รู้ว่าทดสอบอะไร | Feature file เป็น shared language ทั้งทีม |
+| Test ล้าสมัย ไม่ตรงกับ requirement จริง | Feature file = requirement = test ในไฟล์เดียว |
+| หา bug ยาก ไม่รู้ว่า flow ไหนพัง | Scenario ชัดเจน อ่านแล้วรู้ทันทีว่าพังตรงไหน |
 
 ---
 
 ## Stack
 
-| Layer            | Tool                                                         | เวอร์ชัน |
-| ---------------- | ------------------------------------------------------------ | -------- |
-| BDD runner       | [playwright-bdd](https://github.com/vitalets/playwright-bdd) | ^8.4     |
-| UI automation    | [Playwright](https://playwright.dev)                         | ^1.58    |
-| API automation   | Playwright request API                                       | built-in |
-| API mock         | [Prism](https://stoplight.io/open-source/prism)              | ^5.14    |
-| API client (GUI) | [Bruno](https://www.usebruno.com)                            | latest   |
-| Runtime          | [Bun](https://bun.sh)                                        | ^1.0     |
-| Formatter        | [Prettier](https://prettier.io) + gherkin plugin             | ^3.8     |
+| Layer | Tool | หมายเหตุ |
+|-------|------|---------|
+| Test runner | [WebdriverIO v9](https://webdriver.io) | รันด้วย Node (`npx wdio`) |
+| BDD engine | [@wdio/cucumber-framework](https://webdriver.io/docs/frameworks#using-cucumber) + [@cucumber/cucumber](https://cucumber.io) | Gherkin → step definitions |
+| Web automation | WDIO + ChromeDriver | `browser`, `$()` globals |
+| API automation | `BaseAPI` (global `fetch`) | ไม่ต้องเปิด browser |
+| Mobile automation | [Appium v2](https://appium.io) + UIAutomator2 / XCUITest | Flutter via Semantics |
+| API mock | [Prism](https://stoplight.io/open-source/prism) | อ่าน `openapi.yaml` |
+| API client (GUI) | [Bruno](https://www.usebruno.com) | Git-friendly, `.bru` files |
+| Reports | Allure + Living Checklist (custom) | release-based history |
+| Runtime (scripts) | [Bun](https://bun.sh) | install, utilities, Prism |
+| Formatter | [Prettier](https://prettier.io) + gherkin plugin | `.ts` + `.feature` |
 
-> **หมายเหตุ:** โปรเจคนี้ใช้ **Playwright** เป็น test runner ไม่ใช่ Bun test runner
-> ดังนั้นต้องใช้ `bun run test` (ผ่าน Playwright) ไม่ใช่ `bun test`
+> **หมายเหตุ:** WDIO รันด้วย **Node** (`npx wdio`) — Bun ใช้สำหรับ `bun install` และ utility scripts เท่านั้น
 
 ---
 
 ## Prerequisites
 
-| Tool                                    | วิธีติดตั้ง                                 |
-| --------------------------------------- | ------------------------------------------- |
-| [Bun](https://bun.sh) ≥ 1.0             | `curl -fsSL https://bun.sh/install \| bash` |
-| [Bruno](https://www.usebruno.com) (GUI) | ดาวน์โหลดจาก usebruno.com                   |
+| Tool | วิธีติดตั้ง |
+|------|-----------|
+| [Node.js](https://nodejs.org) ≥ 18 | `brew install node` |
+| [Bun](https://bun.sh) ≥ 1.0 | `brew install bun` |
+| [Bruno](https://www.usebruno.com) (GUI, optional) | ดาวน์โหลดจาก usebruno.com |
+| Chrome / Chromium | มีอยู่แล้วบน macOS หรือ `brew install --cask chromium` |
+
+**สำหรับ Mobile testing (Apple Silicon):**
+
+```bash
+sh scripts/setup-m-series.sh
+```
+
+Script ติดตั้ง JDK, Android SDK, ARM64 emulator, Appium และ drivers ให้ครบ
 
 ---
 
@@ -89,32 +103,21 @@ Feature: ระบบ Login
 # 1. ติดตั้ง dependencies
 bun install
 
-# 2. ติดตั้ง Playwright browsers
-bunx playwright install chromium
-
-# 3. สร้าง environment config
+# 2. สร้าง environment config
 cp .env.example .env
 
-# 4. [Terminal 1] เริ่ม Prism mock server (สำหรับ API tests)
+# 3. [Terminal 1] เริ่ม Prism mock server
 bun run mock
 
-# 5. [Terminal 2] รัน tests ทั้งหมด
-bun run test
+# 4. [Terminal 2] รัน web + API tests
+bun run test:web
+bun run test:api
 ```
 
 ผลที่ควรได้:
 
 ```
-Running 6 tests using 2 workers
-
-  ✓  API › ดึงรายการ users ทั้งหมด
-  ✓  API › สร้าง user ใหม่สำเร็จ
-  ✓  API › สร้าง user ที่ข้อมูลไม่ครบ ควรได้ 400
-  ✓  API › ดึง user ที่ไม่มีอยู่ ควรได้ 404
-  ✓  UI  › เข้าสู่ระบบไม่สำเร็จด้วยรหัสผ่านที่ผิด
-  ✓  UI  › เข้าสู่ระบบสำเร็จด้วยข้อมูลที่ถูกต้อง
-
-  6 passed
+Spec Files:    6 passed, 6 total
 ```
 
 ---
@@ -123,54 +126,71 @@ Running 6 tests using 2 workers
 
 ```
 bdd/
-│
-├── features/                    # ① เขียนก่อนเสมอ — Gherkin (.feature files)
+├── features/                         # ① เขียนก่อนเสมอ — Gherkin (.feature files)
 │   ├── ui/
-│   │   └── login.feature        # UI test scenarios
-│   └── api/
-│       └── users.feature        # API test scenarios
+│   │   └── login.feature             # Web UI scenarios
+│   ├── api/
+│   │   └── users.feature             # API scenarios
+│   └── mobile/
+│       └── login.feature             # Flutter mobile scenarios
 │
-├── steps/                       # ② Step definitions — เชื่อม Gherkin กับ code
+├── steps/                            # ② Step definitions — เชื่อม Gherkin กับ code
 │   ├── ui/
-│   │   └── login.steps.ts       # implement steps จาก login.feature
-│   └── api/
-│       └── users.steps.ts       # implement steps จาก users.feature
+│   │   └── login.steps.ts
+│   ├── api/
+│   │   └── users.steps.ts
+│   └── mobile/
+│       └── login.steps.ts
 │
-├── pages/                       # ③ Page Object Model (เฉพาะ UI)
-│   └── login.page.ts            # locators + actions ของหน้า Login
+├── pages/                            # ③ Page Objects (Web) — WDIO $() selectors
+│   └── login.page.ts
+│
+├── screens/                          # ④ Screen Objects (Mobile) — Appium selectors
+│   ├── base.screen.ts                # abstract: wait/tap/scroll/swipe
+│   └── login.screen.ts               # Flutter Semantics identifiers
 │
 ├── fixtures/
-│   └── index.ts                 # Custom fixtures + export Given/When/Then
+│   └── index.ts                      # Cucumber World class + Before/After hooks
 │
 ├── support/
 │   ├── api/
-│   │   └── client.ts            # ApiClient — HTTP wrapper สำหรับ API steps
+│   │   ├── base-api.ts               # standalone fetch wrapper (no browser)
+│   │   └── client.ts                 # re-export alias (deprecated)
 │   └── data/
-│       └── users.data.ts        # Test data กลาง (ใช้ร่วมกัน UI + API)
+│       └── users.data.ts             # test data constants
 │
-├── bruno/                       # Bruno API collection (commit ลง Git ได้)
-│   ├── bruno.json               # collection config
-│   ├── environments/
-│   │   ├── local.bru            # baseUrl = http://localhost:4010 (Prism)
-│   │   └── staging.bru          # baseUrl = https://staging.example.com
-│   └── users/                   # auto-generated จาก generate:bru
-│       ├── 01-get-api-users-200.bru
-│       ├── 02-get-api-users-9999-404.bru
-│       ├── 03-post-api-users-201.bru
-│       └── 04-post-api-users-400.bru
+├── reporters/
+│   └── living-checklist/
+│       ├── index.ts                  # custom WDIO reporter
+│       ├── template.ts               # HTML generator
+│       └── types.ts                  # TypeScript interfaces
+│
+├── flutter_app/                      # Flutter POC app สำหรับ mobile tests
+│   └── lib/
+│       ├── main.dart
+│       └── screens/
+│           ├── login_screen.dart     # Semantics(identifier: '...') widgets
+│           └── home_screen.dart
 │
 ├── scripts/
-│   └── generate-bru.ts          # Script: parse features/api/ → สร้าง .bru files
+│   ├── generate-bru.ts               # parse features/api/ → สร้าง .bru files
+│   └── setup-m-series.sh             # bootstrap Apple Silicon environment
 │
-├── .features-gen/               # (auto-generated, gitignored) Playwright spec files
-│                                # playwright-bdd สร้างจาก .feature ก่อนรัน อย่าแก้ไขตรงนี้
+├── bruno/                            # Bruno API collection
+│   ├── bruno.json
+│   ├── environments/
+│   └── users/                        # auto-generated จาก generate:bru
 │
-├── openapi.yaml                 # OpenAPI 3.0 spec — source of truth ของ API
-├── playwright.config.ts         # Playwright + BDD config
-├── tsconfig.json                # TypeScript config
-├── .env                         # (gitignored) ค่าจริง — copy จาก .env.example
-├── .env.example                 # ตัวอย่าง environment variables
-├── .prettierrc                  # Prettier config (รองรับ .ts และ .feature)
+├── reports/                          # (gitignored) Living Checklist output
+│   ├── history.json                  # append-only run history
+│   └── living-checklist.html         # interactive HTML report
+│
+├── apps/                             # (gitignored) Flutter app binaries (.apk/.app)
+├── openapi.yaml                      # OpenAPI 3.0 spec — source of truth ของ API
+├── wdio.conf.ts                      # WDIO configuration
+├── tsconfig.json
+├── .env                              # (gitignored) ค่าจริง — copy จาก .env.example
+├── .env.example
 └── package.json
 ```
 
@@ -179,40 +199,36 @@ bdd/
 ## Workflow การทำงาน
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  1. เขียน Feature (.feature)                             │
-│     บอกว่าระบบควรทำอะไร ในภาษาที่ทุกคนเข้าใจ            │
-└──────────────────────────┬──────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────┐
-│  2. เขียน Step Definitions (.steps.ts)                   │
-│     เชื่อม Gherkin text กับ Playwright / ApiClient       │
-└──────────────────────────┬──────────────────────────────┘
-                           │
-          ┌────────────────┴────────────────┐
-          │                                 │
-┌─────────▼──────────┐           ┌──────────▼──────────┐
-│  UI: Page Object   │           │  API: ApiClient      │
-│  (pages/*.ts)      │           │  (support/api/)      │
-│  locators+actions  │           │  HTTP GET/POST/etc   │
-└─────────┬──────────┘           └──────────┬──────────┘
-          │                                 │
-          └────────────────┬────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────┐
-│  3. รัน: bun run test                                    │
-│     playwright-bdd generate .features-gen/ แล้วรัน      │
-└──────────────────────────┬──────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────┐
-│  4. ดู Results                                           │
-│     terminal (list) + HTML report + trace (on failure)  │
-└──────────────────────────┬──────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────┐
-│  5. bun run generate:bru → Bruno collection              │
-│     explore API manually + living documentation          │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│  1. เขียน Feature (.feature)                 │
+│     ภาษา Gherkin ที่ทุกคนเข้าใจ              │
+└────────────────────┬────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────┐
+│  2. เขียน Step Definitions (.steps.ts)       │
+│     import { Given, When, Then }             │
+│     from '@cucumber/cucumber'                │
+└────────────────────┬────────────────────────┘
+                     │
+        ┌────────────┴─────────────┐
+        │                          │
+┌───────▼────────┐      ┌──────────▼──────────┐
+│  Web/Mobile    │      │  API                 │
+│  Page/Screen   │      │  BaseAPI (fetch)     │
+│  browser/$()   │      │  ไม่ต้องเปิด browser │
+└───────┬────────┘      └──────────┬──────────┘
+        │                          │
+        └────────────┬─────────────┘
+                     │
+┌────────────────────▼────────────────────────┐
+│  3. รัน: bun run test                        │
+│     npx wdio run wdio.conf.ts                │
+└────────────────────┬────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────┐
+│  4. ดู Results                               │
+│     spec reporter + Allure + Living Checklist│
+└─────────────────────────────────────────────┘
 ```
 
 ---
@@ -221,46 +237,59 @@ bdd/
 
 ```bash
 # ── Tests ──────────────────────────────────────────────────
-bun run test              # รัน BDD tests ทั้งหมด
-bun run test:ui           # เปิด Playwright UI mode (debug-friendly, มี timeline)
-bun run test -- --grep "Login"       # รันเฉพาะ test ที่ชื่อมี "Login"
-bun run test -- --grep "@smoke"      # รันเฉพาะ test ที่ tag ด้วย @smoke
+bun run test                   # รัน all suites (web + api + mobile ถ้าตั้ง MOBILE_PLATFORM)
+bun run test:web               # Web UI tests เท่านั้น
+bun run test:api               # API tests เท่านั้น (ไม่เปิด browser)
+bun run test:mobile:android    # Android emulator (ต้องเปิด emulator ก่อน)
+bun run test:mobile:ios        # iOS simulator (ต้องเปิด simulator ก่อน)
+
+# กรอง scenario ด้วย tag
+TAGS='@smoke' bun run test
+TAGS='not @manual' bun run test:web
 
 # ── Mock API ───────────────────────────────────────────────
-bun run mock              # เริ่ม Prism mock server ที่ port 4010
-bun run mock:verbose      # Prism + debug logs (ดู request/response ทุกอัน)
+bun run mock                   # เริ่ม Prism mock ที่ port 4010
+bun run mock:test              # Prism + API tests + kill Prism (one-liner)
+
+# ── Reports ────────────────────────────────────────────────
+bun run report:checklist       # เปิด Living Checklist HTML (ต้องรัน test ก่อน)
 
 # ── Bruno ──────────────────────────────────────────────────
-bun run generate:bru      # สร้าง .bru files จาก features/api/*.feature
+bun run generate:bru           # สร้าง .bru files จาก features/api/
+bun run generate:bru -- --merge  # สร้าง *.merged.bru (base + override รวมกัน)
+
+# ── Setup ──────────────────────────────────────────────────
+bun run setup:m-series         # bootstrap Apple Silicon (JDK, Android SDK, Appium)
 
 # ── Code Quality ───────────────────────────────────────────
-bun run format            # format ทุกไฟล์ (.ts, .feature, .json, .yaml)
-bun run format:check      # เช็ค format โดยไม่แก้ไข (ใช้ใน CI)
-
-# ── Utilities ──────────────────────────────────────────────
-bun run codegen           # เปิด Playwright codegen สำหรับ record locators
-bunx playwright show-report          # เปิด HTML report ใน browser
+bun run format                 # format ทุกไฟล์ (.ts, .feature, .json, .yaml)
+bun run format:check           # เช็ค format โดยไม่แก้ไข (ใช้ใน CI)
 ```
 
 ---
 
 ## Environment Variables
 
-**Bun โหลด `.env` อัตโนมัติ** — ไม่ต้อง `import 'dotenv/config'` หรือ setup อะไรเพิ่ม
+**Bun โหลด `.env` อัตโนมัติ** สำหรับ utility scripts — WDIO (Node) อ่านผ่าน `process.env`
 
 ```bash
 cp .env.example .env
 ```
 
-| Variable       | Default (fallback)                   | ใช้ที่ไหน                                |
-| -------------- | ------------------------------------ | ---------------------------------------- |
-| `BASE_URL`     | `https://the-internet.herokuapp.com` | `page.goto('/login')` → `BASE_URL/login` |
-| `API_BASE_URL` | `http://localhost:4010`              | `apiContext` fixture → ทุก API request   |
+| Variable | Default | ใช้ที่ไหน |
+|----------|---------|---------|
+| `BASE_URL` | `https://the-internet.herokuapp.com` | `browser.url('/login')` → `BASE_URL/login` |
+| `API_BASE_URL` | `http://localhost:4010` | `BaseAPI` constructor |
+| `MOBILE_PLATFORM` | (unset = web) | กำหนด capability: `android` \| `ios` |
+| `ANDROID_APP_PATH` | `apps/app-debug.apk` | Appium Android capability |
+| `IOS_APP_PATH` | `apps/Runner.app` | Appium iOS capability |
+| `RELEASE_TAG` | git branch name | Living Checklist report label |
+| `TAGS` | (unset = all) | `TAGS='@smoke' bun run test` |
 
 **สลับ environment ทำแค่เปลี่ยน `.env`:**
 
 ```bash
-# ทดสอบกับ Prism mock (API ยังไม่พร้อม)
+# ทดสอบกับ Prism mock
 API_BASE_URL=http://localhost:4010
 
 # ทดสอบกับ real API
@@ -271,24 +300,20 @@ BASE_URL=https://staging.myapp.com
 API_BASE_URL=https://api.staging.myapp.com
 ```
 
-ไม่ต้องแก้ code ใน steps หรือ fixtures เลย
-
 ---
 
 ## เขียน Feature File
 
-Feature files อยู่ใน `features/ui/` (UI tests) และ `features/api/` (API tests)
+Feature files อยู่ใน `features/ui/`, `features/api/`, `features/mobile/`
 
 ### โครงสร้างพื้นฐาน
 
 ```gherkin
 Feature: ชื่อ feature — บอก business capability
 
-  # Background: รัน steps เหล่านี้ก่อนทุก Scenario ในไฟล์นี้
   Background:
-    Given ฉันอยู่ที่หน้า Login
+    Given ฉันอยู่ที่หน้า Login   # รันก่อนทุก Scenario
 
-  # Scenario: 1 scenario = 1 test case = 1 behavior
   Scenario: เข้าสู่ระบบสำเร็จ
     When ฉันกรอกชื่อผู้ใช้ว่า "alice"
     And ฉันกรอกรหัสผ่านว่า "secret"
@@ -296,37 +321,25 @@ Feature: ชื่อ feature — บอก business capability
     Then ฉันควรจะเห็นข้อความเตือนว่า "Welcome!"
 ```
 
-### Scenario Outline — รัน scenario เดิมกับ input หลายชุด
-
-```gherkin
-Scenario Outline: ทดสอบ API หลาย endpoint
-  When  ฉันเรียก GET "<path>"
-  Then  status code ควรเป็น <status>
-
-  Examples:
-    | path            | status |
-    | /api/users      | 200    |
-    | /api/users/9999 | 404    |
-```
-
-### Tags — จัดกลุ่ม test สำหรับ selective run
+### Tags
 
 ```gherkin
 @smoke
 Scenario: เข้าสู่ระบบสำเร็จ
   ...
 
-@regression @login
-Scenario: เข้าสู่ระบบด้วย account ที่ถูก lock
+@manual
+Scenario: ตรวจสอบ UI ที่ไม่สามารถ automate ได้
+  # Living Checklist แสดง scenario นี้เป็น checkbox แทน badge
   ...
 ```
 
 ```bash
-bun run test -- --grep "@smoke"       # รันเฉพาะ smoke tests
-bun run test -- --grep "@regression"  # รันเฉพาะ regression tests
+TAGS='@smoke' bun run test        # รันเฉพาะ smoke
+TAGS='not @manual' bun run test   # ข้าม manual scenarios
 ```
 
-### DataTable — ส่ง structured data ให้ step
+### DataTable
 
 ```gherkin
 When ฉันเรียก POST "/api/users" ด้วย:
@@ -336,102 +349,84 @@ When ฉันเรียก POST "/api/users" ด้วย:
 
 ### กฎสำคัญ
 
-- **1 Feature file = 1 business capability** (login, checkout, user management ฯลฯ)
-- **1 Scenario = independent** — setup ข้อมูลของตัวเองได้โดยไม่พึ่ง scenario อื่น
-- **Step text ต้องตรงกับ step definition** — ถ้าไม่ตรงจะ fail ด้วย `Step not found`
-- **ไม่ควรมี logic ใน Feature** — Feature บอก "อะไร" ไม่ใช่ "ยังไง"
+- **1 Feature file = 1 business capability**
+- **1 Scenario = independent** — ไม่พึ่ง scenario อื่น
+- **Step text ต้องตรงกับ step definition** — ไม่ตรงจะ fail ด้วย `Undefined step`
+- **URL ห้าม hardcode** — ใช้ path (`/login`) ให้ WDIO ต่อกับ `baseUrl` เอง
 
 ---
 
 ## เขียน Step Definitions
 
-Step files อยู่ใน `steps/ui/` และ `steps/api/`
+Step files อยู่ใน `steps/ui/`, `steps/api/`, `steps/mobile/`
 
-> **กฎ:** import `Given/When/Then` จาก `../../fixtures` เท่านั้น ห้าม import จาก `playwright-bdd` โดยตรง
+> **กฎ:** ใช้ `function` keyword เสมอ (ไม่ใช่ arrow function) เพื่อให้ `this` เป็น `AppWorld`
 
 ### ตัวอย่าง UI Steps
 
 ```typescript
-// steps/ui/login.steps.ts
-import { Given, When, Then } from '../../fixtures';
-import { LoginPage } from '../../pages/login.page';
+import { Given, When, Then } from '@cucumber/cucumber';
+import type { AppWorld } from '../../fixtures/index.ts';
+import { LoginPage } from '../../pages/login.page.ts';
 
-Given('ฉันอยู่ที่หน้า Login', async ({ page }) => {
-  await page.goto('/login'); // baseURL มาจาก .env → playwright.config.ts
+Given('ฉันอยู่ที่หน้า Login', async function (this: AppWorld) {
+  await browser.url('/login'); // baseUrl มาจาก wdio.conf.ts → .env
 });
 
-When('ฉันกรอกชื่อผู้ใช้ว่า {string}', async ({ page }, username: string) => {
-  const loginPage = new LoginPage(page);
-  await loginPage.fillUsername(username);
+When('ฉันกรอกชื่อผู้ใช้ว่า {string}', async function (this: AppWorld, username: string) {
+  const page = new LoginPage();
+  await page.fillUsername(username);
 });
 
-Then('ฉันควรจะเห็นข้อความเตือนว่า {string}', async ({ page }, message: string) => {
-  await page.getByText(message).waitFor();
+Then('ฉันควรจะเห็นข้อความเตือนว่า {string}', async function (this: AppWorld, message: string) {
+  await $(`*=${message}`).waitForDisplayed({ timeout: 10_000 });
 });
 ```
 
 ### ตัวอย่าง API Steps
 
 ```typescript
-// steps/api/users.steps.ts
-import { Given, When, Then } from '../../fixtures';
-import { ApiClient } from '../../support/api/client';
+import { When, Then, DataTable } from '@cucumber/cucumber';
+import type { AppWorld } from '../../fixtures/index.ts';
+import { BaseAPI } from '../../support/api/base-api.ts';
 
-When('ฉันเรียก GET {string}', async ({ apiContext, world }, path: string) => {
-  const api = new ApiClient(apiContext);
-  world.lastResponse = await api.get(path); // เก็บ response ไว้ใน world
+When('ฉันเรียก GET {string}', async function (this: AppWorld, path: string) {
+  const api = new BaseAPI(process.env['API_BASE_URL'] ?? 'http://localhost:4010');
+  this.lastResponse = await api.get(path);
+  // เก็บไว้ใน this (AppWorld) เพื่อให้ Then steps ใช้ต่อได้
 });
 
-Then('status code ควรเป็น {int}', async ({ world }, status: number) => {
-  const actual = world.lastResponse!.status();
-  if (actual !== status) throw new Error(`Expected ${status} but got ${actual}`);
+Then('status code ควรเป็น {int}', async function (this: AppWorld, status: number) {
+  if (this.lastResponse!.status !== status)
+    throw new Error(`Expected ${status} but got ${this.lastResponse!.status}`);
 });
 ```
 
 ### Parameter Types
 
-| Gherkin    | TypeScript   | ตัวอย่างค่า                           |
-| ---------- | ------------ | ------------------------------------- |
-| `{string}` | `string`     | `"hello world"`                       |
-| `{int}`    | `number`     | `200`                                 |
-| `{float}`  | `number`     | `3.14`                                |
-| DataTable  | 3rd argument | `table.hashes()` → `[{ key: "val" }]` |
-
-### Fixtures ที่ใช้ได้ใน steps
-
-| Fixture      | Type                           | ใช้ทำอะไร                             |
-| ------------ | ------------------------------ | ------------------------------------- |
-| `page`       | `Page`                         | Playwright browser page (UI steps)    |
-| `apiContext` | `APIRequestContext`            | HTTP client พร้อม baseURL (API steps) |
-| `world`      | `{ lastResponse, preferCode }` | เก็บ state ระหว่าง steps ของ scenario |
+| Gherkin | TypeScript | ตัวอย่าง |
+|---------|-----------|---------|
+| `{string}` | `string` | `"hello world"` |
+| `{int}` | `number` | `200` |
+| `{float}` | `number` | `3.14` |
+| DataTable | `DataTable` | `table.hashes()` → `[{ key: "val" }]` |
 
 ---
 
-## Page Object Model
+## Page & Screen Objects
 
-Page Object อยู่ใน `pages/` — เก็บ **locators** และ **actions** ของแต่ละหน้าไว้ที่เดียว
+### Page Objects (Web) — `pages/`
+
+ใช้ WDIO getter pattern — element resolve ทุกครั้งที่เรียก (ไม่ stale):
 
 ```typescript
 // pages/login.page.ts
-import type { Locator, Page } from '@playwright/test';
-
 export class LoginPage {
-  readonly usernameInput: Locator;
-  readonly passwordInput: Locator;
-
-  constructor(page: Page) {
-    // กำหนด locators ใน constructor เสมอ (ไม่ใช่ class body)
-    // เพื่อให้ถูกต้องกับ TypeScript strict + verbatimModuleSyntax
-    this.usernameInput = page.locator('#username');
-    this.passwordInput = page.locator('#password');
-  }
+  get usernameInput() { return $('#username'); }
+  get passwordInput() { return $('#password'); }
 
   async fillUsername(username: string) {
-    await this.usernameInput.fill(username);
-  }
-
-  async fillPassword(password: string) {
-    await this.passwordInput.fill(password);
+    await this.usernameInput.setValue(username);
   }
 }
 ```
@@ -440,123 +435,149 @@ export class LoginPage {
 
 ```
 UI เปลี่ยน selector จาก #username → [data-testid="username"]
-                                    ↓
-แก้ที่ pages/login.page.ts จุดเดียว — step files ไม่ต้องแตะเลย
+                              ↓
+แก้ที่ pages/login.page.ts จุดเดียว — step files ไม่ต้องแตะ
 ```
 
-**Locator strategies ที่แนะนำ (เรียงตาม resilience):**
+### Screen Objects (Mobile) — `screens/`
+
+extends `BaseScreen` ซึ่งมี helper methods สำหรับ Appium:
 
 ```typescript
-page.getByRole('button', { name: 'Login' }); // ✅ best — semantic HTML
-page.getByLabel('Username'); // ✅ good — accessibility
-page.getByTestId('login-btn'); // ✅ good — explicit test id
-page.locator('#username'); // ⚠️ ok — id อาจเปลี่ยน
-page.locator('.btn-primary'); // ❌ avoid — CSS class เปลี่ยนบ่อย
+// screens/login.screen.ts
+export class LoginScreen extends BaseScreen {
+  // byId('x') → $('~x') → Appium accessibility id selector
+  get usernameField() { return this.byId('login_username_field'); }
+  get loginButton()   { return this.byId('login_submit_button'); }
+
+  async fillUsername(username: string) {
+    const el = await this.waitForElement(this.usernameField);
+    await this.setText(el, username);
+  }
+}
+```
+
+Flutter app ต้องมี `Semantics(identifier: 'login_username_field')` ครอบ widget:
+
+```dart
+Semantics(
+  identifier: 'login_username_field',  // → UIAutomator2: ~login_username_field
+  child: TextField(...),
+)
 ```
 
 ---
 
 ## API Testing
 
-### ApiClient
+### BaseAPI
 
-`support/api/client.ts` เป็น wrapper บาง ๆ รอบ Playwright request:
+`support/api/base-api.ts` ใช้ global `fetch` — รันได้โดยไม่ต้องเปิด browser:
 
 ```typescript
-const api = new ApiClient(apiContext);
+const api = new BaseAPI('http://localhost:4010');
 
-// GET
 const res = await api.get('/api/users');
-
-// POST พร้อม body
 const res = await api.post('/api/users', { username: 'alice', email: 'alice@example.com' });
-
-// PUT, DELETE
 const res = await api.put('/api/users/1', { username: 'alice-updated' });
 const res = await api.delete('/api/users/1');
 
-// Assert status + ดึง body ในขั้นตอนเดียว
-const body = await api.expectJson<User>(res, 201);
-```
-
-### รับ Response ใน Then steps ผ่าน world
-
-```typescript
-When('ฉันเรียก GET {string}', async ({ apiContext, world }, path) => {
-  world.lastResponse = await new ApiClient(apiContext).get(path);
-  //    ↑ เก็บไว้ใน world เพื่อให้ Then steps ใช้ต่อได้
-});
-
-Then('status code ควรเป็น {int}', async ({ world }, status) => {
-  const actual = world.lastResponse!.status();
-  //                    ↑ ดึงจาก world
-});
+// อ่าน response
+console.log(res.status);           // 200
+const body = await res.json();     // parse JSON body
 ```
 
 ### ทดสอบ Error Cases กับ Prism Mock
 
-Prism static mock return response แรก (200) เสมอ ต้องใช้ `Prefer` header เพื่อบอกว่าต้องการ status ไหน:
+Prism คืน response แรก (2xx) เสมอ ต้องใช้ `Prefer` header:
 
 ```gherkin
 Scenario: ดึง user ที่ไม่มีอยู่ ควรได้ 404
-  Given ทดสอบ error case ด้วย status 404  ← บอก Prism ว่าต้องการ 404
+  Given ทดสอบ error case ด้วย status 404
   When  ฉันเรียก GET "/api/users/9999"
   Then  status code ควรเป็น 404
 ```
 
-> เมื่อ switch ไป real API ลบบรรทัด `Given ทดสอบ error case...` ออกได้เลย
-> server จะ return 404 ตาม logic จริงเอง
+> เมื่อ switch ไป real API ลบ `Given ทดสอบ error case...` ออกได้เลย
 
 ---
 
-## Fixtures และ World
+## Mobile Testing
 
-`fixtures/index.ts` เป็น central place สำหรับ:
+### Architecture
 
-1. Custom fixtures (`apiContext`, `world`)
-2. Export `Given/When/Then` ที่ bind กับ custom fixtures
-
-### world fixture
-
-`world` คือ plain object ที่เก็บ state ระหว่าง steps ของ scenario เดียวกัน Playwright สร้าง instance ใหม่ทุก scenario → **ไม่มี state รั่วระหว่าง scenarios**
-
-```typescript
-export type AppFixtures = {
-  apiContext: Awaited<ReturnType<typeof request.newContext>>;
-  world: {
-    lastResponse: APIResponse | null; // response ล่าสุดจาก API call
-    preferCode: number | null; // Prism Prefer header สำหรับ error cases
-  };
-};
+```
+Flutter App → Semantics(identifier: '...')
+                        ↓
+              Android: content-desc   iOS: accessibilityIdentifier
+                        ↓
+              Appium UIAutomator2 / XCUITest
+                        ↓
+              WDIO $('~identifier') selector
 ```
 
-### เพิ่ม Fixture ใหม่
+### Setup
 
-เพิ่มที่ `fixtures/index.ts` เท่านั้น ทุก step file จะได้ใช้ทันที:
+```bash
+# 1. Bootstrap environment (ครั้งแรกครั้งเดียว)
+sh scripts/setup-m-series.sh
+
+# 2. Build Flutter app
+cd flutter_app
+flutter pub get
+flutter build apk --debug
+cp build/app/outputs/flutter-apk/app-debug.apk ../apps/app-debug.apk
+
+# 3. เปิด emulator
+$ANDROID_HOME/emulator/emulator -avd Pixel_7_API_34_arm64 &
+
+# 4. รัน mobile tests
+bun run test:mobile:android
+```
+
+### Capability ที่ใช้
+
+| ค่า | Android | iOS |
+|-----|---------|-----|
+| `automationName` | `UiAutomator2` | `XCUITest` |
+| `app` | `apps/app-debug.apk` | `apps/Runner.app` |
+| selector | `$('~identifier')` | `$('~identifier')` |
+
+---
+
+## Cucumber World
+
+`fixtures/index.ts` กำหนด `AppWorld` class — สร้างใหม่ทุก scenario, ไม่มี state รั่ว:
 
 ```typescript
-// ตัวอย่าง: loggedInPage — เปิดหน้าและ login ไว้ก่อน
-// ใช้ใน steps ที่ต้องการ session อยู่แล้ว ไม่ต้อง login ซ้ำทุก scenario
-loggedInPage: async ({ page }, use) => {
-  await page.goto('/login');
-  await page.locator('#username').fill('admin');
-  await page.locator('#password').fill('password');
-  await page.getByRole('button', { name: 'Login' }).click();
-  await page.waitForURL('/dashboard');
-  await use(page);
-},
+export class AppWorld extends World {
+  lastResponse: Response | null = null;  // response ล่าสุดจาก API
+  preferCode: number | null = null;      // Prism Prefer header
+}
 ```
+
+Step files เข้าถึง world ผ่าน `this`:
+
+```typescript
+Given('step', async function (this: AppWorld) {
+  this.lastResponse = await api.get('/path');
+});
+
+Then('step', async function (this: AppWorld) {
+  console.log(this.lastResponse?.status); // 200
+});
+```
+
+**Before hook** reset ทุก property อัตโนมัติก่อน scenario
+**After hook** ถ่าย screenshot เมื่อ fail (web suite)
 
 ---
 
 ## Mock API ด้วย Prism
 
-Prism อ่าน `openapi.yaml` แล้วสร้าง mock server ที่ตอบ response ตาม examples ทันที
-
 ```bash
 bun run mock
-# [11:00:00] › Starting Prism…
-# [11:00:00] › Prism is listening on http://127.0.0.1:4010
+# Prism is listening on http://0.0.0.0:4010
 ```
 
 ```
@@ -564,308 +585,293 @@ openapi.yaml ──► Prism mock (port 4010) ──► API tests
                                        ──► Bruno (manual explore)
 ```
 
-**Flow การใช้งาน:**
-
-| สถานการณ์         | ตั้งค่า                                               |
-| ----------------- | ----------------------------------------------------- |
-| API ยังไม่พร้อม   | `API_BASE_URL=http://localhost:4010` + `bun run mock` |
-| API พร้อมบน local | `API_BASE_URL=http://localhost:3000`                  |
-| ทดสอบบน staging   | `API_BASE_URL=https://api.staging.myapp.com`          |
-
-**อัปเดต `openapi.yaml` เมื่อ API เปลี่ยน:**
-
-```yaml
-# เพิ่ม endpoint ใหม่ใน openapi.yaml
-paths:
-  /api/products:
-    get:
-      responses:
-        '200':
-          content:
-            application/json:
-              example:
-                - id: 1
-                  name: 'Widget'
-```
-
-Prism จะ return example นั้นทันทีเมื่อเรียก `GET /api/products`
+| สถานการณ์ | ตั้งค่า |
+|----------|--------|
+| API ยังไม่พร้อม | `API_BASE_URL=http://localhost:4010` + `bun run mock` |
+| API พร้อมบน local | `API_BASE_URL=http://localhost:3000` |
+| ทดสอบบน staging | `API_BASE_URL=https://api.staging.myapp.com` |
 
 ---
 
 ## Bruno API Collection
 
-Bruno เป็น Git-friendly API client เก็บ collection เป็น `.bru` text files
-
 ### เปิด Collection
 
 1. เปิด Bruno app → **Open Collection** → เลือกโฟลเดอร์ `bruno/`
-2. เลือก environment: **local** (Prism, port 4010) หรือ **staging**
+2. เลือก environment: **local** (Prism) หรือ **staging**
 3. ส่ง request ได้เลย
 
-### Auto-generate จาก Feature Files
+### Auto-generate + Override System
 
 ```bash
-bun run generate:bru
+bun run generate:bru          # สร้าง base .bru files จาก features/api/
+bun run generate:bru -- --merge  # สร้าง *.merged.bru = base + override
 ```
 
-Script อ่าน `features/api/*.feature` แล้วสร้าง `.bru` files อัตโนมัติ รองรับ:
-
-- HTTP method จาก `When ฉันเรียก GET/POST/PUT/DELETE`
-- Request body จาก DataTable
-- Expected status → สร้าง test assertion ใน `.bru` ให้เลย
-
-ตัวอย่าง input → output:
-
-```gherkin
-# features/api/users.feature
-Scenario: สร้าง user ใหม่สำเร็จ
-  When ฉันเรียก POST "/api/users" ด้วย:
-    | username | email             |
-    | alice    | alice@example.com |
-  Then status code ควรเป็น 201
-```
+Override system:
 
 ```
-# bruno/users/03-post-api-users-201.bru (auto-generated)
-meta {
-  name: สร้าง user ใหม่สำเร็จ
-  type: http
-  seq: 3
-}
+bruno/users/
+├── 01-get-api-users-200.bru          ← auto-generated (ถูก overwrite ได้)
+├── 01-get-api-users-200.override.bru ← manual edits (NEVER overwritten)
+└── 01-get-api-users-200.merged.bru   ← debug only (--merge flag)
+```
 
-post {
-  url: {{baseUrl}}/api/users
-  body: json
-}
+แก้ไขแค่ `*.override.bru` — script จะไม่แตะ override files เลย
 
-body:json {
-  { "username": "", "email": "" }
-}
+---
 
-tests {
-  test("status is 201", function() {
-    expect(res.status).to.equal(201);
-  });
-}
+## Living Checklist Reporter
+
+Custom WDIO reporter ที่ track test history ข้าม releases:
+
+```bash
+# รันพร้อม tag release
+RELEASE_TAG=v1.2.0 bun run test
+
+# เปิด report
+bun run report:checklist
+```
+
+**Features:**
+- **Release selector** — เลือกดู release ไหนก็ได้จาก history
+- **Trend chart** — กราฟ automated vs manual ข้าม releases
+- **`@manual` tag** — แสดงเป็น interactive checkbox (เก็บไว้ใน localStorage)
+- **Compare mode** — diff สอง releases (new/removed/changed scenarios)
+- **Export** — Markdown หรือ JSON
+
+**ค่า RELEASE_TAG:**
+
+```bash
+RELEASE_TAG=v1.0.0 bun run test      # version
+RELEASE_TAG=sprint-23 bun run test   # sprint
+RELEASE_TAG=hotfix-auth bun run test # branch/feature
+# ถ้าไม่ระบุ → ใช้ git branch name อัตโนมัติ
 ```
 
 ---
 
 ## Config Files อธิบาย
 
-### `playwright.config.ts`
+### `wdio.conf.ts`
 
 ```typescript
-defineBddConfig({
-  features: 'features/**/*.feature', // ครอบคลุมทุก subdirectory
-  steps: ['steps/**/*.ts', 'fixtures/index.ts'], // ต้องรวม fixtures เสมอ
-});
-// → สร้าง .features-gen/ ก่อนรัน (auto, gitignored)
+export const config = {
+  specs: ['./features/**/*.feature'],
 
-defineConfig({
-  fullyParallel: false, // ปิด — BDD scenarios มักมี dependency กัน
-  retries: CI ? 1 : 0, // retry ครั้งเดียวใน CI ลด flaky
-  timeout: 30_000, // 30 วินาทีต่อ test
+  suites: {
+    web:    ['./features/ui/**/*.feature'],
+    api:    ['./features/api/**/*.feature'],
+    mobile: ['./features/mobile/**/*.feature'],
+  },
 
-  reporter: [
-    ['list'], // real-time output ใน terminal
-    ['html', { open: 'never' }], // → playwright-report/index.html
+  framework: '@wdio/cucumber-framework',
+  cucumberOpts: {
+    require: ['./fixtures/index.ts', './steps/**/*.ts'],
+    timeout: 60_000,
+    tagExpression: process.env['TAGS'], // TAGS='@smoke' กรอง scenario
+  },
+
+  baseUrl: process.env['BASE_URL'] ?? 'https://the-internet.herokuapp.com',
+
+  services: [
+    // Appium เปิดเฉพาะ mobile suite
+    ...(mobilePlatform ? [['appium', { ... }]] : []),
   ],
 
-  use: {
-    baseURL: process.env.BASE_URL ?? 'https://the-internet.herokuapp.com',
-    browserName: 'chromium',
-    screenshot: 'only-on-failure', // ประหยัด disk
-    trace: 'retain-on-failure', // เก็บไว้เปิด debug เมื่อ fail
-  },
-});
+  reporters: ['spec', 'allure', [LivingChecklistReporter, { ... }]],
+};
+```
+
+**เลือก suite:**
+
+```bash
+bun run test:web              # WDIO --suite web
+bun run test:api              # WDIO --suite api
+bun run test:mobile:android   # MOBILE_PLATFORM=android WDIO --suite mobile
 ```
 
 ### `tsconfig.json`
 
-| Option                     | ค่า         | ผลกระทบ                                                  |
-| -------------------------- | ----------- | -------------------------------------------------------- |
-| `strict`                   | `true`      | เปิด TypeScript strict mode ทั้งหมด                      |
-| `moduleResolution`         | `"bundler"` | ใช้กับ Bun (ไม่ใช่ Node.js resolution)                   |
-| `verbatimModuleSyntax`     | `true`      | type-only imports ต้องใช้ `import type`                  |
-| `noUncheckedIndexedAccess` | `true`      | `arr[0]` มี type เป็น `T \| undefined` บังคับ null-check |
-
-### `.prettierrc`
-
-```json
-{
-  "plugins": ["prettier-plugin-gherkin"],
-  "singleQuote": true,
-  "trailingComma": "all",
-  "printWidth": 100
-}
-```
-
-`prettier-plugin-gherkin` format `.feature` files ด้วย — `bun run format` ครอบคลุมทุกอย่าง
-
-### `openapi.yaml`
-
-OpenAPI 3.0 spec — **single source of truth** ของ API:
-
-| ใช้กับ | ทำอะไร                                         |
-| ------ | ---------------------------------------------- |
-| Prism  | อ่าน spec → สร้าง mock server                  |
-| Bruno  | import spec → สร้าง collection ได้             |
-| QA     | อ่านเพื่อเข้าใจ API contract ก่อนเขียน feature |
-| Dev    | document API ให้ทีม                            |
+| Option | ค่า | ผลกระทบ |
+|--------|-----|---------|
+| `strict` | `true` | TypeScript strict mode ทั้งหมด |
+| `moduleResolution` | `"bundler"` | ใช้กับ Bun scripts |
+| `verbatimModuleSyntax` | `true` | type-only imports ต้องใช้ `import type` |
+| `types` | `["@wdio/globals/types", ...]` | `browser`, `$`, `$$` เป็น globals |
+| `ts-node.esm` | `true` | WDIO โหลด config/steps ผ่าน ts-node ESM |
 
 ---
 
 ## ดู Test Results
 
+### Terminal (spec reporter)
+
+ผลแสดงทันทีระหว่างรัน — pass/fail ต่อ scenario
+
+### Allure Report
+
 ```bash
-# HTML Report (หลังรัน test)
-bunx playwright show-report
-
-# Trace Viewer (เมื่อ test fail)
-bunx playwright show-trace test-results/**/trace.zip
-# → เปิด browser แสดง timeline ทุก action, screenshot, network request
-
-# รันแบบ headed (เห็น browser จริง)
-bun run test -- --headed
-
-# Debug mode (หยุดที่ each step)
-bun run test -- --debug
+# ต้องติดตั้ง allure CLI ก่อน
+brew install allure
+allure serve allure-results
 ```
 
-**Trace** บอกอะไรได้บ้าง:
+### Living Checklist
 
-- Screenshot ณ จุดที่ fail
-- Network requests ทุกอัน (status, body)
-- Timeline ของ actions
-- Console logs จาก browser
+```bash
+bun run report:checklist
+# เปิด reports/living-checklist.html ใน browser
+```
 
 ---
 
 ## เพิ่ม Feature ใหม่
 
-### เพิ่ม UI Feature
+### เพิ่ม Web Feature
 
 ```bash
 # 1. สร้าง feature file
 touch features/ui/checkout.feature
 
-# 2. เขียน scenarios ก่อน (ก่อน implement)
-# Feature: ระบบ Checkout
-#   Scenario: ชำระเงินสำเร็จ
-#     Given ฉันมีสินค้าในตะกร้า
-#     When  ฉันกดปุ่ม "ชำระเงิน"
-#     Then  ฉันควรเห็นหน้า "ยืนยันการสั่งซื้อ"
+# 2. เขียน scenarios ก่อน (BDD: write feature first)
 
-# 3. สร้าง Page Object
+# 3. สร้าง Page Object (ถ้ามีหน้าใหม่)
 touch pages/checkout.page.ts
 
 # 4. สร้าง step definitions
 touch steps/ui/checkout.steps.ts
-# → implement steps ที่ bddgen แจ้งว่า missing
 
 # 5. รัน
-bun run test -- --grep "Checkout"
+bun run test:web
 ```
 
 ### เพิ่ม API Feature
 
 ```bash
-# 1. เพิ่ม endpoint ใน openapi.yaml ก่อน
+# 1. เพิ่ม endpoint ใน openapi.yaml
 
 # 2. สร้าง feature file
 touch features/api/products.feature
 
-# 3. สร้าง step definitions (ถ้า steps ใหม่)
-touch steps/api/products.steps.ts
-# steps ทั่วไปอย่าง "ฉันเรียก GET", "status code ควรเป็น"
-# มีอยู่แล้วใน users.steps.ts ใช้ร่วมกันได้เลย
+# 3. step definitions ทั่วไป (GET, POST, status check)
+#    มีอยู่แล้วใน users.steps.ts — ใช้ร่วมกันได้เลย
 
 # 4. Generate Bruno collection
 bun run generate:bru
 
 # 5. รัน
-bun run test -- --grep "Products"
+bun run test:api
+```
+
+### เพิ่ม Mobile Feature
+
+```bash
+# 1. สร้าง feature file
+touch features/mobile/checkout.feature
+
+# 2. เพิ่ม Semantics identifier ใน Flutter app
+#    Semantics(identifier: 'checkout_button', child: ElevatedButton(...))
+
+# 3. สร้าง Screen Object (ถ้ามีหน้าใหม่)
+touch screens/checkout.screen.ts
+
+# 4. สร้าง step definitions
+touch steps/mobile/checkout.steps.ts
+
+# 5. รัน
+bun run test:mobile:android
 ```
 
 ---
 
 ## Common Mistakes
 
+### ใช้ arrow function ใน step definitions
+
+```typescript
+// ❌ this เป็น undefined
+Given('step', async ({ }) => { });
+
+// ❌ this เป็น undefined
+Given('step', async () => {
+  this.lastResponse; // undefined!
+});
+
+// ✅ ถูกต้อง — function keyword ให้ this เป็น AppWorld
+Given('step', async function (this: AppWorld) {
+  this.lastResponse; // ✓
+});
+```
+
 ### import ผิดที่
 
 ```typescript
-// ❌ ไม่ได้รับ custom fixtures (apiContext, world)
-import { createBdd } from 'playwright-bdd';
-const { Given } = createBdd();
+// ❌ ไม่ใช่ @cucumber/cucumber โดยตรง
+import { Given } from 'playwright-bdd'; // ไม่มีแล้ว
 
 // ✅ ถูกต้อง
-import { Given } from '../../fixtures';
+import { Given, When, Then } from '@cucumber/cucumber';
 ```
 
-### Locator ใน class body
+### ใช้ browser global ใน API steps
 
 ```typescript
-// ❌ TypeScript strict error: "used before initialization"
-export class LoginPage {
-  readonly input = this.page.locator('#username'); // ERROR
+// ❌ browser ไม่มีใน API suite (ไม่เปิด browser)
+When('step', async function (this: AppWorld) {
+  await browser.url('/api/users'); // ERROR
+});
 
-  constructor(private page: Page) {}
-}
-
-// ✅ ถูกต้อง — กำหนดใน constructor
-export class LoginPage {
-  readonly input: Locator;
-
-  constructor(page: Page) {
-    this.input = page.locator('#username');
-  }
-}
+// ✅ ใช้ BaseAPI (global fetch)
+When('step', async function (this: AppWorld) {
+  const api = new BaseAPI(process.env['API_BASE_URL']!);
+  this.lastResponse = await api.get('/api/users');
+});
 ```
 
 ### Module-level state
 
 ```typescript
-// ❌ race condition ถ้า parallel, state รั่วระหว่าง scenarios
-let lastResponse: APIResponse;
+// ❌ state รั่วระหว่าง scenarios
+let lastResponse: Response;
 
-// ✅ ใช้ world fixture — scoped ต่อ scenario
-async ({ world }) => {
-  world.lastResponse = await api.get(path);
-};
+Given('step', async function () {
+  lastResponse = await fetch('/api');
+});
+
+// ✅ ใช้ this (AppWorld) — scoped ต่อ scenario
+Given('step', async function (this: AppWorld) {
+  this.lastResponse = await fetch('/api');
+});
 ```
 
-### Scenario มี dependency กัน
+### Screen selector ผิด driver
 
-```gherkin
-# ❌ scenario 2 พึ่ง data จาก scenario 1
-Scenario: สร้าง user    # → สร้าง id=1
-Scenario: ดึง user     # → GET /users/1 (พังถ้ารันแยก)
+```typescript
+// ❌ Flutter driver selector (ใช้กับ automationName: 'Flutter')
+$('flutter=key("login_button")');
 
-# ✅ แต่ละ scenario independent
-Scenario: ดึง user ที่มีอยู่
-  Given มี user อยู่ในระบบแล้ว   # setup เอง
-  When  ฉันเรียก GET "/api/users/1"
-  Then  status code ควรเป็น 200
+// ✅ UIAutomator2/XCUITest selector (Semantics identifier)
+$('~login_button');    // accessibility id
 ```
 
-### URL ฝังใน Feature
+### URL hardcode ใน Feature
 
 ```gherkin
-# ❌ URL ฝังแข็ง — เปลี่ยน environment ต้องแก้ feature
-Given ฉันอยู่ที่หน้า Login ของเว็บ "https://production.myapp.com/login"
+# ❌ เปลี่ยน environment ต้องแก้ feature
+Given ฉันอยู่ที่ "https://production.myapp.com/login"
 
-# ✅ ใช้ path — baseURL อ่านจาก .env อัตโนมัติ
+# ✅ ใช้ path — baseUrl อ่านจาก .env ผ่าน wdio.conf.ts
 Given ฉันอยู่ที่หน้า Login
-# step: await page.goto('/login')  ← baseURL มาจาก playwright.config.ts
+# step: browser.url('/login')
 ```
 
 ### type import ผิด
 
 ```typescript
 // ❌ error กับ verbatimModuleSyntax
-import { Page } from '@playwright/test';
+import { AppWorld } from '../../fixtures/index.ts'; // value import
 
-// ✅ ถูกต้อง
-import type { Page } from '@playwright/test';
+// ✅ ถูกต้อง — ใช้แค่เป็น type annotation
+import type { AppWorld } from '../../fixtures/index.ts';
 ```

@@ -1,24 +1,27 @@
-import { Given, When, Then } from '../../fixtures';
-import { LoginPage } from '../../pages/login.page';
+import { Given, When, Then } from '@cucumber/cucumber';
+import type { AppWorld } from '../../fixtures/index.ts';
+import { LoginPage } from '../../pages/login.page.ts';
 
-Given('ฉันอยู่ที่หน้า Login', async ({ page }) => {
-  await page.goto('/login');
+Given('ฉันอยู่ที่หน้า Login', async function (this: AppWorld) {
+  await browser.url('/login');
 });
 
-When('ฉันกรอกชื่อผู้ใช้ว่า {string}', async ({ page }, username: string) => {
-  const loginPage = new LoginPage(page);
+When('ฉันกรอกชื่อผู้ใช้ว่า {string}', async function (this: AppWorld, username: string) {
+  const loginPage = new LoginPage();
   await loginPage.fillUsername(username);
 });
 
-When('ฉันกรอกรหัสผ่านว่า {string}', async ({ page }, password: string) => {
-  const loginPage = new LoginPage(page);
+When('ฉันกรอกรหัสผ่านว่า {string}', async function (this: AppWorld, password: string) {
+  const loginPage = new LoginPage();
   await loginPage.fillPassword(password);
 });
 
-When('ฉันกดปุ่ม {string}', async ({ page }, buttonName: string) => {
-  await page.getByRole('button', { name: buttonName }).click();
+When('ฉันกดปุ่ม {string}', async function (this: AppWorld, buttonName: string) {
+  // ใช้ partial text (*=) แทน exact match (=) เพราะ button text อาจมี whitespace
+  await $(`button*=${buttonName}`).click();
 });
 
-Then('ฉันควรจะเห็นข้อความเตือนว่า {string}', async ({ page }, message: string) => {
-  await page.getByText(message).waitFor();
+Then('ฉันควรจะเห็นข้อความเตือนว่า {string}', async function (this: AppWorld, message: string) {
+  const el = await $(`*=${message}`);
+  await el.waitForDisplayed({ timeout: 10_000 });
 });
