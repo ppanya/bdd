@@ -1,6 +1,6 @@
 # BDD Automation Framework
 
-Framework สำหรับ **Behavior-Driven Development (BDD)** ครอบคลุม Web UI, API, และ Mobile (Flutter)
+Framework สำหรับ **Behavior-Driven Development (BDD)** ครอบคลุม Web UI, API, และ Mobile (Flutter/Native)
 ภายใต้ runner เดียว พร้อม mock server, API collection, และ living checklist report
 
 ---
@@ -51,53 +51,57 @@ Feature: ระบบ Login
 
 ### ทำไม BDD?
 
-| ปัญหาเดิม | BDD แก้ด้วย |
-|-----------|------------|
-| QA เขียน test เสร็จแล้ว Dev ไม่รู้ว่าทดสอบอะไร | Feature file เป็น shared language ทั้งทีม |
-| Test ล้าสมัย ไม่ตรงกับ requirement จริง | Feature file = requirement = test ในไฟล์เดียว |
-| หา bug ยาก ไม่รู้ว่า flow ไหนพัง | Scenario ชัดเจน อ่านแล้วรู้ทันทีว่าพังตรงไหน |
+| ปัญหาเดิม                                      | BDD แก้ด้วย                                   |
+| ---------------------------------------------- | --------------------------------------------- |
+| QA เขียน test เสร็จแล้ว Dev ไม่รู้ว่าทดสอบอะไร | Feature file เป็น shared language ทั้งทีม     |
+| Test ล้าสมัย ไม่ตรงกับ requirement จริง        | Feature file = requirement = test ในไฟล์เดียว |
+| หา bug ยาก ไม่รู้ว่า flow ไหนพัง               | Scenario ชัดเจน อ่านแล้วรู้ทันทีว่าพังตรงไหน  |
 
 ---
 
 ## Stack
 
-| Layer | Tool | หมายเหตุ |
-|-------|------|---------|
-| Test runner | [WebdriverIO v9](https://webdriver.io) | รันด้วย Node (`npx wdio`) |
-| BDD engine | [@wdio/cucumber-framework](https://webdriver.io/docs/frameworks#using-cucumber) + [@cucumber/cucumber](https://cucumber.io) | Gherkin → step definitions |
-| Web automation | WDIO + ChromeDriver | `browser`, `$()` globals |
-| API automation | `BaseAPI` (global `fetch`) | ไม่ต้องเปิด browser |
-| Mobile automation | [Appium v2](https://appium.io) + UIAutomator2 / XCUITest | Flutter via Semantics |
-| API mock | [Prism](https://stoplight.io/open-source/prism) | อ่าน `openapi.yaml` |
-| API client (GUI) | [Bruno](https://www.usebruno.com) | Git-friendly, `.bru` files |
-| Reports | Allure + Living Checklist (custom) | release-based history |
-| Runtime (scripts) | [Bun](https://bun.sh) | install, utilities, Prism |
-| Formatter | [Prettier](https://prettier.io) + gherkin plugin | `.ts` + `.feature` |
+| Layer             | Tool                                                                                                                        | หมายเหตุ                     |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| Test runner       | [WebdriverIO v9](https://webdriver.io)                                                                                      | รันด้วย Node (`bunx wdio`)   |
+| BDD engine        | [@wdio/cucumber-framework](https://webdriver.io/docs/frameworks#using-cucumber) + [@cucumber/cucumber](https://cucumber.io) | Gherkin → step definitions   |
+| Web automation    | WDIO + ChromeDriver                                                                                                         | `browser`, `$()` globals     |
+| API automation    | `BaseAPI` (global `fetch`)                                                                                                  | ไม่ต้องเปิด browser          |
+| Mobile automation | [Appium v3](https://appium.io) + UIAutomator2 / XCUITest                                                                    | Flutter via Semantics bridge |
+| API mock          | [Prism](https://stoplight.io/open-source/prism)                                                                             | อ่าน `openapi.yaml`          |
+| API client (GUI)  | [Bruno](https://www.usebruno.com)                                                                                           | Git-friendly, `.bru` files   |
+| Reports           | Allure + Living Checklist (custom)                                                                                          | release-based history        |
+| Runtime (scripts) | [Bun](https://bun.sh)                                                                                                       | install, utilities, Prism    |
+| Formatter         | [Prettier](https://prettier.io) + gherkin plugin                                                                            | `.ts` + `.feature`           |
 
-> **หมายเหตุ:** WDIO รันด้วย **Node** (`npx wdio`) — Bun ใช้สำหรับ `bun install` และ utility scripts เท่านั้น
+> **หมายเหตุ:** WDIO รันด้วย **Node** (`bunx wdio`) — Bun ใช้สำหรับ `bun install` และ utility scripts เท่านั้น
 
 ---
 
 ## Prerequisites
 
-| Tool | วิธีติดตั้ง |
-|------|-----------|
-| [Node.js](https://nodejs.org) ≥ 18 | `brew install node` |
-| [Bun](https://bun.sh) ≥ 1.0 | `brew install bun` |
-| [Bruno](https://www.usebruno.com) (GUI, optional) | ดาวน์โหลดจาก usebruno.com |
-| Chrome / Chromium | มีอยู่แล้วบน macOS หรือ `brew install --cask chromium` |
+| Tool                                              | วิธีติดตั้ง                                            |
+| ------------------------------------------------- | ------------------------------------------------------ |
+| [Node.js](https://nodejs.org) ≥ 18                | `brew install node`                                    |
+| [Bun](https://bun.sh) ≥ 1.0                       | `brew install bun`                                     |
+| [Bruno](https://www.usebruno.com) (GUI, optional) | ดาวน์โหลดจาก usebruno.com                              |
+| Chrome / Chromium                                 | มีอยู่แล้วบน macOS หรือ `brew install --cask chromium` |
 
 **สำหรับ Mobile testing (Apple Silicon):**
 
 ```bash
+# ติดตั้ง JDK, Android SDK, ARM64 emulator, Appium และ drivers
 sh scripts/setup-m-series.sh
-```
 
-Script ติดตั้ง JDK, Android SDK, ARM64 emulator, Appium และ drivers ให้ครบ
+# ติดตั้ง Appium drivers (UiAutomator2, XCUITest)
+bun run setup:drivers
+```
 
 ---
 
 ## Quick Start
+
+### Setup (First Time Only)
 
 ```bash
 # 1. ติดตั้ง dependencies
@@ -106,10 +110,20 @@ bun install
 # 2. สร้าง environment config
 cp .env.example .env
 
-# 3. [Terminal 1] เริ่ม Prism mock server
+# 3. Bootstrap Apple Silicon environment (includes JDK, Android SDK, Appium, emulator)
+sh scripts/setup-m-series.sh
+
+# 4. ติดตั้ง Appium drivers (UiAutomator2, XCUITest)
+bun run setup:drivers
+```
+
+### Web + API Tests (No Mobile)
+
+```bash
+# [Terminal 1] เริ่ม Prism mock server
 bun run mock
 
-# 4. [Terminal 2] รัน web + API tests
+# [Terminal 2] รัน web + API tests
 bun run test:web
 bun run test:api
 ```
@@ -118,6 +132,77 @@ bun run test:api
 
 ```
 Spec Files:    6 passed, 6 total
+```
+
+### Mobile Tests
+
+**Before running mobile tests** — prepare environment **once per session**:
+
+```bash
+# [Terminal 1] Boot emulator + start Appium + install APK + clear data
+bun run start:android
+# Output: ✅ Android ready. Appium PID: 12345
+```
+
+**Then run tests** (emulator + Appium จะรันอยู่ตลอด):
+
+```bash
+# [Terminal 2] รัน mobile tests
+bun run test:mobile:android
+
+# หรือรัน feature เฉพาะ
+bun run test:mobile:android -- --feature login
+bun run test:mobile:android -- --feature navigation
+```
+
+สาเหตุการแยก `start:android` ออกมา:
+
+- **`start:android`** เปิด emulator + Appium เดียวครั้ง → ประหยัด boot time
+- **`test:mobile:android`** รัน tests ซ้ำๆ ไม่ต้อง restart environment
+- Pre-flight checks → fail fast ถ้า emulator/Appium ไม่พร้อม
+
+---
+
+## Before Running Tests
+
+| Test Type  | Prerequisites                                      | Setup Script                                               |
+| ---------- | -------------------------------------------------- | ---------------------------------------------------------- |
+| **Web**    | Node.js, Chrome                                    | `bun install` ✓                                            |
+| **API**    | Node.js, Prism mock                                | `bun install` + `bun run mock` ✓                           |
+| **Mobile** | Android SDK, JDK, Appium, emulator, Appium drivers | `sh scripts/setup-m-series.sh` + `bun run setup:drivers` ✓ |
+
+### First-Time Setup Checklist
+
+- [ ] `bun install` — install Node + Bun dependencies
+- [ ] `cp .env.example .env` — create environment config
+- [ ] `sh scripts/setup-m-series.sh` — install Android SDK, JDK, Appium (Apple Silicon only)
+- [ ] `bun run setup:drivers` — install Appium drivers
+
+### Before Every Mobile Test Session
+
+```bash
+bun run start:android
+```
+
+Script นี้จะ:
+
+1. ✓ Boot emulator (ถ้ายังไม่รัน)
+2. ✓ Start Appium server
+3. ✓ Install APK
+4. ✓ **Clear app data** — reset สถานะเป็น Onboarding
+5. ✓ Launch app
+
+ถ้า emulator / Appium รันอยู่แล้ว จะข้ามขั้นตอนนั้น → เร็ว
+
+### Verify Setup
+
+```bash
+# Web + API tests
+bun run test:web
+bun run test:api
+
+# Mobile tests (after bun run start:android)
+bun run test:mobile:android
 ```
 
 ---
@@ -132,7 +217,8 @@ bdd/
 │   ├── api/
 │   │   └── users.feature             # API scenarios
 │   └── mobile/
-│       └── login.feature             # Flutter mobile scenarios
+│       ├── login.feature             # Login flow (Email tab, PDPA consent)
+│       └── navigation.feature        # Bottom navigation bar
 │
 ├── steps/                            # ② Step definitions — เชื่อม Gherkin กับ code
 │   ├── ui/
@@ -146,8 +232,11 @@ bdd/
 │   └── login.page.ts
 │
 ├── screens/                          # ④ Screen Objects (Mobile) — Appium selectors
-│   ├── base.screen.ts                # abstract: wait/tap/scroll/swipe
-│   └── login.screen.ts               # Flutter Semantics identifiers
+│   ├── base.screen.ts                # abstract: waitForElement/tap/scroll/swipe
+│   ├── login.screen.ts               # Email/Phone login, PDPA
+│   ├── onboarding.screen.ts          # Onboarding / welcome screen
+│   ├── home.screen.ts                # Home + bottom navigation
+│   └── pdpa.screen.ts                # PDPA Consent screen
 │
 ├── fixtures/
 │   └── index.ts                      # Cucumber World class + Before/After hooks
@@ -155,7 +244,7 @@ bdd/
 ├── support/
 │   ├── api/
 │   │   ├── base-api.ts               # standalone fetch wrapper (no browser)
-│   │   └── client.ts                 # re-export alias (deprecated)
+│   │   └── client.ts                 # re-export alias
 │   └── data/
 │       └── users.data.ts             # test data constants
 │
@@ -165,16 +254,13 @@ bdd/
 │       ├── template.ts               # HTML generator
 │       └── types.ts                  # TypeScript interfaces
 │
-├── flutter_app/                      # Flutter POC app สำหรับ mobile tests
-│   └── lib/
-│       ├── main.dart
-│       └── screens/
-│           ├── login_screen.dart     # Semantics(identifier: '...') widgets
-│           └── home_screen.dart
-│
 ├── scripts/
-│   ├── generate-bru.ts               # parse features/api/ → สร้าง .bru files
-│   └── setup-m-series.sh             # bootstrap Apple Silicon environment
+│   ├── start-android.sh              # boot emulator + start Appium + install APK
+│   ├── run-mobile-tests.sh           # pre-flight checks + run WDIO mobile suite
+│   ├── setup-m-series.sh             # bootstrap Apple Silicon environment
+│   ├── setup-drivers.sh              # install Appium drivers
+│   ├── inspect-android.sh            # open Appium Inspector (Android)
+│   └── inspect-ios.sh                # open Appium Inspector (iOS)
 │
 ├── bruno/                            # Bruno API collection
 │   ├── bruno.json
@@ -185,7 +271,7 @@ bdd/
 │   ├── history.json                  # append-only run history
 │   └── living-checklist.html         # interactive HTML report
 │
-├── apps/                             # (gitignored) Flutter app binaries (.apk/.app)
+├── apps/                             # (gitignored) APK / .app binaries
 ├── openapi.yaml                      # OpenAPI 3.0 spec — source of truth ของ API
 ├── wdio.conf.ts                      # WDIO configuration
 ├── tsconfig.json
@@ -222,7 +308,7 @@ bdd/
                      │
 ┌────────────────────▼────────────────────────┐
 │  3. รัน: bun run test                        │
-│     npx wdio run wdio.conf.ts                │
+│     bunx wdio run wdio.conf.ts               │
 └────────────────────┬────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────┐
@@ -240,12 +326,34 @@ bdd/
 bun run test                   # รัน all suites (web + api + mobile ถ้าตั้ง MOBILE_PLATFORM)
 bun run test:web               # Web UI tests เท่านั้น
 bun run test:api               # API tests เท่านั้น (ไม่เปิด browser)
-bun run test:mobile:android    # Android emulator (ต้องเปิด emulator ก่อน)
-bun run test:mobile:ios        # iOS simulator (ต้องเปิด simulator ก่อน)
+bun run test:mobile:android    # Android: pre-flight + รัน mobile suite
+bun run test:mobile:ios        # iOS: pre-flight + รัน mobile suite
 
 # กรอง scenario ด้วย tag
 TAGS='@smoke' bun run test
 TAGS='not @manual' bun run test:web
+
+# ── Mobile Environment ──────────────────────────────────────
+bun run start:android          # boot emulator + start Appium + install APK (ครั้งเดียวต่อ session)
+
+# ── Mobile Test Selection ───────────────────────────────────
+# รัน feature เฉพาะ (ชื่อ หรือ path)
+bun run test:mobile:android -- --feature login
+bun run test:mobile:android -- --feature navigation
+bun run test:mobile:android -- --spec features/mobile/login.feature
+
+# รัน scenario เฉพาะ (partial match)
+bun run test:mobile:android -- --scenario "กรอก email และ password"
+
+# รัน ด้วย tag
+bun run test:mobile:android -- --tags @smoke
+TAGS='@smoke' bun run test:mobile:android
+
+# รวม filter
+bun run test:mobile:android -- --feature login --tags "@happy-path"
+
+# Full reinstall (ข้าม APP_READY, สำหรับ CI)
+APP_READY=false bun run test:mobile:android
 
 # ── Mock API ───────────────────────────────────────────────
 bun run mock                   # เริ่ม Prism mock ที่ port 4010
@@ -260,6 +368,9 @@ bun run generate:bru -- --merge  # สร้าง *.merged.bru (base + override
 
 # ── Setup ──────────────────────────────────────────────────
 bun run setup:m-series         # bootstrap Apple Silicon (JDK, Android SDK, Appium)
+bun run setup:drivers          # ติดตั้ง Appium drivers (UiAutomator2, XCUITest)
+bun run inspect:android        # เปิด Appium Inspector สำหรับ Android
+bun run inspect:ios            # เปิด Appium Inspector สำหรับ iOS
 
 # ── Code Quality ───────────────────────────────────────────
 bun run format                 # format ทุกไฟล์ (.ts, .feature, .json, .yaml)
@@ -276,15 +387,19 @@ bun run format:check           # เช็ค format โดยไม่แก้
 cp .env.example .env
 ```
 
-| Variable | Default | ใช้ที่ไหน |
-|----------|---------|---------|
-| `BASE_URL` | `https://the-internet.herokuapp.com` | `browser.url('/login')` → `BASE_URL/login` |
-| `API_BASE_URL` | `http://localhost:4010` | `BaseAPI` constructor |
-| `MOBILE_PLATFORM` | (unset = web) | กำหนด capability: `android` \| `ios` |
-| `ANDROID_APP_PATH` | `apps/app-debug.apk` | Appium Android capability |
-| `IOS_APP_PATH` | `apps/Runner.app` | Appium iOS capability |
-| `RELEASE_TAG` | git branch name | Living Checklist report label |
-| `TAGS` | (unset = all) | `TAGS='@smoke' bun run test` |
+| Variable              | Default                              | ใช้ที่ไหน                                                            |
+| --------------------- | ------------------------------------ | -------------------------------------------------------------------- |
+| `BASE_URL`            | `https://the-internet.herokuapp.com` | `browser.url('/login')` → `BASE_URL/login`                           |
+| `API_BASE_URL`        | `http://localhost:4010`              | `BaseAPI` constructor                                                |
+| `MOBILE_PLATFORM`     | (unset = web)                        | กำหนด capability: `android` \| `ios`                                 |
+| `ANDROID_APP_PATH`    | `apps/app-mock-release.apk`          | Appium Android `app` capability                                      |
+| `IOS_APP_PATH`        | `apps/Runner.app`                    | Appium iOS `app` capability                                          |
+| `ANDROID_AVD`         | `Pixel_7_API_34_arm64`               | `start-android.sh` — ชื่อ AVD ที่จะ boot                             |
+| `ANDROID_APP_PACKAGE` | (unset)                              | `start-android.sh` — launch app หลัง install (optional)              |
+| `APPIUM_PORT`         | `4723`                               | Appium server port                                                   |
+| `APP_READY`           | `false`                              | `true` = skip APK reinstall (set อัตโนมัติโดย `run-mobile-tests.sh`) |
+| `RELEASE_TAG`         | git branch name                      | Living Checklist report label                                        |
+| `TAGS`                | (unset = all)                        | `TAGS='@smoke' bun run test`                                         |
 
 **สลับ environment ทำแค่เปลี่ยน `.env`:**
 
@@ -386,7 +501,7 @@ Then('ฉันควรจะเห็นข้อความเตือน�
 ### ตัวอย่าง API Steps
 
 ```typescript
-import { When, Then, DataTable } from '@cucumber/cucumber';
+import { When, Then } from '@cucumber/cucumber';
 import type { AppWorld } from '../../fixtures/index.ts';
 import { BaseAPI } from '../../support/api/base-api.ts';
 
@@ -404,12 +519,12 @@ Then('status code ควรเป็น {int}', async function (this: AppWorld, 
 
 ### Parameter Types
 
-| Gherkin | TypeScript | ตัวอย่าง |
-|---------|-----------|---------|
-| `{string}` | `string` | `"hello world"` |
-| `{int}` | `number` | `200` |
-| `{float}` | `number` | `3.14` |
-| DataTable | `DataTable` | `table.hashes()` → `[{ key: "val" }]` |
+| Gherkin    | TypeScript  | ตัวอย่าง                              |
+| ---------- | ----------- | ------------------------------------- |
+| `{string}` | `string`    | `"hello world"`                       |
+| `{int}`    | `number`    | `200`                                 |
+| `{float}`  | `number`    | `3.14`                                |
+| DataTable  | `DataTable` | `table.hashes()` → `[{ key: "val" }]` |
 
 ---
 
@@ -422,8 +537,12 @@ Then('status code ควรเป็น {int}', async function (this: AppWorld, 
 ```typescript
 // pages/login.page.ts
 export class LoginPage {
-  get usernameInput() { return $('#username'); }
-  get passwordInput() { return $('#password'); }
+  get usernameInput() {
+    return $('#username');
+  }
+  get passwordInput() {
+    return $('#password');
+  }
 
   async fillUsername(username: string) {
     await this.usernameInput.setValue(username);
@@ -447,21 +566,35 @@ extends `BaseScreen` ซึ่งมี helper methods สำหรับ Appium
 // screens/login.screen.ts
 export class LoginScreen extends BaseScreen {
   // byId('x') → $('~x') → Appium accessibility id selector
-  get usernameField() { return this.byId('login_username_field'); }
-  get loginButton()   { return this.byId('login_submit_button'); }
+  get emailField() {
+    return this.byId('login_email_field');
+  }
+  get loginButton() {
+    return this.byId('login_submit_button');
+  }
 
-  async fillUsername(username: string) {
-    const el = await this.waitForElement(this.usernameField);
-    await this.setText(el, username);
+  async fillEmail(email: string) {
+    const el = await this.waitForElement(this.emailField);
+    await this.setText(el, email);
   }
 }
 ```
 
-Flutter app ต้องมี `Semantics(identifier: 'login_username_field')` ครอบ widget:
+Screen objects ที่มีอยู่:
+
+| File                   | หน้า                                               |
+| ---------------------- | -------------------------------------------------- |
+| `base.screen.ts`       | Abstract base — waitForElement, tap, scroll, swipe |
+| `onboarding.screen.ts` | Welcome / onboarding screen                        |
+| `login.screen.ts`      | Email tab, Phone tab, Login button                 |
+| `pdpa.screen.ts`       | PDPA Consent — accept button                       |
+| `home.screen.ts`       | Home screen + bottom navigation bar                |
+
+Flutter app ต้องมี `Semantics(identifier: '...')` ครอบ widget:
 
 ```dart
 Semantics(
-  identifier: 'login_username_field',  // → UIAutomator2: ~login_username_field
+  identifier: 'login_email_field',  // → UIAutomator2: ~login_email_field
   child: TextField(...),
 )
 ```
@@ -483,8 +616,8 @@ const res = await api.put('/api/users/1', { username: 'alice-updated' });
 const res = await api.delete('/api/users/1');
 
 // อ่าน response
-console.log(res.status);           // 200
-const body = await res.json();     // parse JSON body
+console.log(res.status); // 200
+const body = await res.json(); // parse JSON body
 ```
 
 ### ทดสอบ Error Cases กับ Prism Mock
@@ -516,32 +649,89 @@ Flutter App → Semantics(identifier: '...')
               WDIO $('~identifier') selector
 ```
 
-### Setup
+### Workflow ปกติ
+
+Mobile testing แยกออกเป็น 2 ขั้นตอนชัดเจน:
+
+**ขั้น 1 — เตรียม environment (ทำครั้งเดียวต่อ session)**
 
 ```bash
-# 1. Bootstrap environment (ครั้งแรกครั้งเดียว)
-sh scripts/setup-m-series.sh
+bun run start:android
+```
 
-# 2. Build Flutter app
-cd flutter_app
-flutter pub get
-flutter build apk --debug
-cp build/app/outputs/flutter-apk/app-debug.apk ../apps/app-debug.apk
+script นี้จะ:
 
-# 3. เปิด emulator
-$ANDROID_HOME/emulator/emulator -avd Pixel_7_API_34_arm64 &
+1. Boot emulator AVD (`Pixel_7_API_34_arm64`) ถ้ายังไม่รัน
+2. หยุด Appium เก่า (ถ้ามี `.appium.pid`) แล้วเริ่มใหม่ที่ port 4723
+3. รอ Appium พร้อม (poll `/status` สูงสุด 30 วินาที)
+4. เปิด Android accessibility สำหรับ Flutter Semantics bridge
+5. ติดตั้ง APK ด้วย `adb install -r`
 
-# 4. รัน mobile tests
+**ขั้น 2 — รัน tests**
+
+```bash
+# รัน mobile suite ทั้งหมด
 bun run test:mobile:android
+
+# รัน feature เฉพาะ (ชื่อไฟล์ ไม่ต้อง path/extension)
+bun run test:mobile:android -- --feature login
+bun run test:mobile:android -- --feature navigation
+
+# รัน ด้วย full path
+bun run test:mobile:android -- --spec features/mobile/login.feature
+
+# รัน scenario เฉพาะ (partial match กับชื่อ scenario)
+bun run test:mobile:android -- --scenario "กรอก email และ password"
+
+# รัน ด้วย Cucumber tag
+bun run test:mobile:android -- --tags @smoke
+TAGS='@smoke' bun run test:mobile:android
+
+# รวม filter
+bun run test:mobile:android -- --feature login --tags "@happy-path"
+bun run test:mobile:android -- --feature login --scenario "เข้าสู่ระบบสำเร็จ"
+```
+
+`run-mobile-tests.sh` ทำ pre-flight checks ก่อนรัน — ถ้า emulator ไม่ได้เชื่อมต่อหรือ Appium ไม่รัน จะ fail พร้อมคำแนะนำ:
+
+```
+❌ No Android emulator connected.
+   Run first:  bun run start:android
+```
+
+### APP_READY — skip reinstall + data cleared
+
+`run-mobile-tests.sh` ตั้ง `APP_READY=true` อัตโนมัติ → WDIO ข้ามการ reinstall APK
+(เพราะ `start:android` ติดตั้ง + clear data ให้แล้ว):
+
+**ผลข้าง ๆ**:
+
+- `adb install -r` ตั้ง `noReset: true` → เร็ว ไม่ต้อง reinstall
+- `pm clear <package>` ใน `start:android` → ทุกครั้ง reset app state → tests เริ่มจาก Onboarding เสมอ
+- ไม่มี stale data จากรอบ test ก่อนหน้า
+
+```bash
+# Force full reinstall (สำหรับ CI หรือเมื่อ APK เปลี่ยน)
+APP_READY=false bun run test:mobile:android
 ```
 
 ### Capability ที่ใช้
 
-| ค่า | Android | iOS |
-|-----|---------|-----|
-| `automationName` | `UiAutomator2` | `XCUITest` |
-| `app` | `apps/app-debug.apk` | `apps/Runner.app` |
-| selector | `$('~identifier')` | `$('~identifier')` |
+| ค่า              | Android                     | iOS                |
+| ---------------- | --------------------------- | ------------------ |
+| `automationName` | `UiAutomator2`              | `XCUITest`         |
+| `app`            | `apps/app-mock-release.apk` | `apps/Runner.app`  |
+| `avd`            | `Pixel_7_API_34_arm64`      | —                  |
+| selector         | `$('~identifier')`          | `$('~identifier')` |
+
+### Appium Inspector
+
+ใช้ inspect UI element บน emulator/simulator ที่รันอยู่:
+
+```bash
+bun run inspect:android   # เปิด Inspector สำหรับ Android
+bun run inspect:ios       # เปิด Inspector สำหรับ iOS
+```
 
 ---
 
@@ -551,8 +741,8 @@ bun run test:mobile:android
 
 ```typescript
 export class AppWorld extends World {
-  lastResponse: Response | null = null;  // response ล่าสุดจาก API
-  preferCode: number | null = null;      // Prism Prefer header
+  lastResponse: Response | null = null; // response ล่าสุดจาก API
+  preferCode: number | null = null; // Prism Prefer header
 }
 ```
 
@@ -585,11 +775,11 @@ openapi.yaml ──► Prism mock (port 4010) ──► API tests
                                        ──► Bruno (manual explore)
 ```
 
-| สถานการณ์ | ตั้งค่า |
-|----------|--------|
-| API ยังไม่พร้อม | `API_BASE_URL=http://localhost:4010` + `bun run mock` |
-| API พร้อมบน local | `API_BASE_URL=http://localhost:3000` |
-| ทดสอบบน staging | `API_BASE_URL=https://api.staging.myapp.com` |
+| สถานการณ์         | ตั้งค่า                                               |
+| ----------------- | ----------------------------------------------------- |
+| API ยังไม่พร้อม   | `API_BASE_URL=http://localhost:4010` + `bun run mock` |
+| API พร้อมบน local | `API_BASE_URL=http://localhost:3000`                  |
+| ทดสอบบน staging   | `API_BASE_URL=https://api.staging.myapp.com`          |
 
 ---
 
@@ -634,6 +824,7 @@ bun run report:checklist
 ```
 
 **Features:**
+
 - **Release selector** — เลือกดู release ไหนก็ได้จาก history
 - **Trend chart** — กราฟ automated vs manual ข้าม releases
 - **`@manual` tag** — แสดงเป็น interactive checkbox (เก็บไว้ใน localStorage)
@@ -674,13 +865,20 @@ export const config = {
 
   baseUrl: process.env['BASE_URL'] ?? 'https://the-internet.herokuapp.com',
 
-  services: [
-    // Appium เปิดเฉพาะ mobile suite
-    ...(mobilePlatform ? [['appium', { ... }]] : []),
-  ],
+  // Appium ไม่ใช้ @wdio/appium-service — manage ด้วย start-android.sh แทน
+  // (Appium v3 เขียน log ไปที่ stderr — service จะ fail ใน onPrepare)
+  services: [],
 
   reporters: ['spec', 'allure', [LivingChecklistReporter, { ... }]],
 };
+```
+
+**APP_READY flag:**
+
+```typescript
+// APP_READY=true → noReset: true, dontStopAppOnReset: true
+// APP_READY=false (default) → full clean install
+const appReady = process.env['APP_READY'] === 'true';
 ```
 
 **เลือก suite:**
@@ -688,18 +886,18 @@ export const config = {
 ```bash
 bun run test:web              # WDIO --suite web
 bun run test:api              # WDIO --suite api
-bun run test:mobile:android   # MOBILE_PLATFORM=android WDIO --suite mobile
+bun run test:mobile:android   # MOBILE_PLATFORM=android + APP_READY=true + --suite mobile
 ```
 
 ### `tsconfig.json`
 
-| Option | ค่า | ผลกระทบ |
-|--------|-----|---------|
-| `strict` | `true` | TypeScript strict mode ทั้งหมด |
-| `moduleResolution` | `"bundler"` | ใช้กับ Bun scripts |
-| `verbatimModuleSyntax` | `true` | type-only imports ต้องใช้ `import type` |
-| `types` | `["@wdio/globals/types", ...]` | `browser`, `$`, `$$` เป็น globals |
-| `ts-node.esm` | `true` | WDIO โหลด config/steps ผ่าน ts-node ESM |
+| Option                 | ค่า                            | ผลกระทบ                                 |
+| ---------------------- | ------------------------------ | --------------------------------------- |
+| `strict`               | `true`                         | TypeScript strict mode ทั้งหมด          |
+| `moduleResolution`     | `"bundler"`                    | ใช้กับ Bun scripts                      |
+| `verbatimModuleSyntax` | `true`                         | type-only imports ต้องใช้ `import type` |
+| `types`                | `["@wdio/globals/types", ...]` | `browser`, `$`, `$$` เป็น globals       |
+| `ts-node.esm`          | `true`                         | WDIO โหลด config/steps ผ่าน ts-node ESM |
 
 ---
 
@@ -767,19 +965,27 @@ bun run test:api
 ### เพิ่ม Mobile Feature
 
 ```bash
-# 1. สร้าง feature file
+# 1. เตรียม environment (ถ้ายังไม่ได้ทำ)
+bun run start:android
+
+# 2. สร้าง feature file
 touch features/mobile/checkout.feature
 
-# 2. เพิ่ม Semantics identifier ใน Flutter app
-#    Semantics(identifier: 'checkout_button', child: ElevatedButton(...))
+# 3. Inspect UI ด้วย Appium Inspector เพื่อหา accessibility identifiers
+bun run inspect:android
 
-# 3. สร้าง Screen Object (ถ้ามีหน้าใหม่)
+# 4. สร้าง Screen Object (ถ้ามีหน้าใหม่)
 touch screens/checkout.screen.ts
+# → extend BaseScreen, ใช้ this.byId('accessibility_id') สำหรับ native
+# → หรือ this.flutterByKey('value_key') สำหรับ Flutter (automationName: FlutterIntegration)
 
-# 4. สร้าง step definitions
+# 5. สร้าง step definitions
 touch steps/mobile/checkout.steps.ts
 
-# 5. รัน
+# 6. รัน เฉพาะ feature ใหม่
+bun run test:mobile:android -- --feature checkout
+
+# 7. รัน ทั้งหมด
 bun run test:mobile:android
 ```
 
@@ -790,9 +996,6 @@ bun run test:mobile:android
 ### ใช้ arrow function ใน step definitions
 
 ```typescript
-// ❌ this เป็น undefined
-Given('step', async ({ }) => { });
-
 // ❌ this เป็น undefined
 Given('step', async () => {
   this.lastResponse; // undefined!
@@ -807,10 +1010,10 @@ Given('step', async function (this: AppWorld) {
 ### import ผิดที่
 
 ```typescript
-// ❌ ไม่ใช่ @cucumber/cucumber โดยตรง
+// ❌
 import { Given } from 'playwright-bdd'; // ไม่มีแล้ว
 
-// ✅ ถูกต้อง
+// ✅
 import { Given, When, Then } from '@cucumber/cucumber';
 ```
 
@@ -835,24 +1038,21 @@ When('step', async function (this: AppWorld) {
 // ❌ state รั่วระหว่าง scenarios
 let lastResponse: Response;
 
-Given('step', async function () {
-  lastResponse = await fetch('/api');
-});
-
 // ✅ ใช้ this (AppWorld) — scoped ต่อ scenario
 Given('step', async function (this: AppWorld) {
   this.lastResponse = await fetch('/api');
 });
 ```
 
-### Screen selector ผิด driver
+### รัน mobile tests โดยไม่ start environment ก่อน
 
-```typescript
-// ❌ Flutter driver selector (ใช้กับ automationName: 'Flutter')
-$('flutter=key("login_button")');
+```bash
+# ❌ ถ้า Appium ไม่รัน → error ทันที
+bun run test:mobile:android
 
-// ✅ UIAutomator2/XCUITest selector (Semantics identifier)
-$('~login_button');    // accessibility id
+# ✅ เตรียม environment ก่อนเสมอ (ครั้งเดียวต่อ session)
+bun run start:android
+bun run test:mobile:android
 ```
 
 ### URL hardcode ใน Feature
@@ -872,6 +1072,6 @@ Given ฉันอยู่ที่หน้า Login
 // ❌ error กับ verbatimModuleSyntax
 import { AppWorld } from '../../fixtures/index.ts'; // value import
 
-// ✅ ถูกต้อง — ใช้แค่เป็น type annotation
+// ✅
 import type { AppWorld } from '../../fixtures/index.ts';
 ```

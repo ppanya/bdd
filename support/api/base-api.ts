@@ -13,7 +13,7 @@ export class BaseAPI {
     defaultHeaders: Record<string, string> = {
       Accept: 'application/json',
       'Content-Type': 'application/json',
-    }
+    },
   ) {
     this.baseURL = baseURL.replace(/\/$/, '');
     this.defaultHeaders = defaultHeaders;

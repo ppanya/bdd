@@ -47,7 +47,11 @@ interface ParsedRequest {
 // ── BRU section names that can be overridden ──────────────────────────────────
 type BruSection =
   | 'meta'
-  | 'get' | 'post' | 'put' | 'patch' | 'delete'
+  | 'get'
+  | 'post'
+  | 'put'
+  | 'patch'
+  | 'delete'
   | 'headers'
   | 'body:json'
   | 'tests'
@@ -75,9 +79,7 @@ function buildBruContent(req: ParsedRequest, seq: number): string {
 
   const bodyType = hasRequestBody ? 'json' : 'none';
   const needsPrefer = req.expectedStatus !== null && req.expectedStatus >= 400;
-  const headersSection = needsPrefer
-    ? `\nheaders {\n  Prefer: code=${req.expectedStatus}\n}`
-    : '';
+  const headersSection = needsPrefer ? `\nheaders {\n  Prefer: code=${req.expectedStatus}\n}` : '';
 
   return `meta {
   name: ${req.scenarioName}
@@ -132,9 +134,7 @@ function mergeBruContents(base: string, override: string): string {
     baseSections.set(name, body);
   }
 
-  return [...baseSections.entries()]
-    .map(([name, body]) => `${name} {${body}}`)
-    .join('\n\n');
+  return [...baseSections.entries()].map(([name, body]) => `${name} {${body}}`).join('\n\n');
 }
 
 // ── Feature parser ────────────────────────────────────────────────────────────
@@ -276,7 +276,7 @@ async function run() {
 
   console.log(`\nสรุป: สร้างไฟล์ .bru ทั้งหมด ${totalGenerated} ไฟล์`);
   if (totalPreserved > 0) console.log(`       ข้าม override ${totalPreserved} ไฟล์ (preserved)`);
-  if (totalMerged > 0)   console.log(`       สร้าง merged ${totalMerged} ไฟล์`);
+  if (totalMerged > 0) console.log(`       สร้าง merged ${totalMerged} ไฟล์`);
 }
 
 run().catch((err) => {

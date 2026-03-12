@@ -22,12 +22,37 @@
       "Bash(git log:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "mcp__appium-mcp__select_platform",
+      "mcp__appium-mcp__select_device",
+      "mcp__appium-mcp__boot_simulator",
+      "mcp__appium-mcp__create_session",
+      "mcp__appium-mcp__delete_session",
+      "mcp__appium-mcp__appium_screenshot",
+      "mcp__appium-mcp__appium_get_page_source",
+      "mcp__appium-mcp__generate_locators",
+      "mcp__appium-mcp__appium_generate_tests",
+      "mcp__appium-mcp__appium_find_element",
+      "mcp__appium-mcp__appium_click",
+      "mcp__appium-mcp__appium_set_value",
+      "mcp__appium-mcp__appium_get_text",
+      "mcp__appium-mcp__appium_scroll",
+      "mcp__appium-mcp__appium_scroll_to_element",
+      "mcp__appium-mcp__appium_swipe",
+      "mcp__appium-mcp__appium_get_contexts",
+      "mcp__appium-mcp__appium_switch_context",
+      "mcp__appium-mcp__appium_handle_alert",
+      "mcp__appium-mcp__appium_get_orientation",
+      "mcp__appium-mcp__appium_set_orientation",
+      "mcp__appium-mcp__appium_activate_app",
+      "mcp__appium-mcp__appium_list_apps",
+      "mcp__appium-mcp__appium_is_app_installed",
+      "mcp__appium-mcp__appium_double_tap",
+      "mcp__appium-mcp__appium_long_press",
+      "mcp__appium-mcp__appium_drag_and_drop",
+      "mcp__appium-mcp__appium_element_screenshot",
+      "mcp__appium-mcp__appium_documentation_query"
     ],
-    "deny": [
-      "Bash(git push:*)",
-      "Bash(git reset --hard:*)",
-      "Bash(rm -rf:*)"
-    ]
+    "deny": ["Bash(git push:*)", "Bash(git reset --hard:*)", "Bash(rm -rf:*)"]
   }
 }

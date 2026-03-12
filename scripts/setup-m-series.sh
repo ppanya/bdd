@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 # setup-m-series.sh — Bootstrap Appium + Flutter testing on Apple Silicon
-# รัน: sh scripts/setup-m-series.sh
+# รัน: bash scripts/setup-m-series.sh
 
 set -eu
 
@@ -171,27 +171,36 @@ if ! command -v bun >/dev/null 2>&1; then
 fi
 success "Bun: $(bun --version)"
 
-# ── 9. Node / npx (for WDIO) ─────────────────────────────────────────────────
-info "Checking Node..."
-if ! command -v node >/dev/null 2>&1; then
-  brew install node
+# ── 9. Node via nvm (required by Appium driver management) ───────────────────
+# Appium 2.x hardcode เรียก `npm` CLI ภายใน — ไม่มีทางเลี่ยง
+# ~/.bun/bin/node เป็น shim ที่ไม่มี npm → ต้อง source nvm ให้ nvm's node/npm
+# อยู่หน้า PATH ก่อน Bun's shim
+info "Loading Node via nvm (npm required by Appium internals)..."
+NVM_DIR="${NVM_DIR:-${HOME}/.nvm}"
+if [ ! -s "${NVM_DIR}/nvm.sh" ]; then
+  error "nvm not found at ${NVM_DIR}. Please install nvm first: https://github.com/nvm-sh/nvm"
 fi
-success "Node: $(node --version)"
-
-# ── 10. Appium + drivers ──────────────────────────────────────────────────────
-info "Installing Appium..."
-if ! command -v appium >/dev/null 2>&1; then
-  npm install -g appium
-  # BUG FIX: npm global bin อาจยังไม่อยู่ใน PATH ใน sh session
-  # เพิ่มเข้าไปทันทีหลัง install เพื่อให้ appium driver install ต่อได้
-  NPM_BIN="$(npm config get prefix)/bin"
-  export PATH="${NPM_BIN}:${PATH}"
+# shellcheck disable=SC1091
+source "${NVM_DIR}/nvm.sh"
+nvm use default 2>/dev/null || nvm use --lts 2>/dev/null || true
+if ! command -v npm >/dev/null 2>&1; then
+  info "No Node version active — installing LTS via nvm..."
+  nvm install --lts
+  nvm alias default lts/*
+  nvm use default
 fi
-success "Appium: $(appium --version)"
+success "Node: $(node --version) | npm: $(npm --version)"
 
-info "Installing Appium drivers..."
-appium driver install uiautomator2 || warn "uiautomator2 may already be installed"
-appium driver install xcuitest || warn "xcuitest may already be installed"
+# ── 10. Appium (local via bun install) ───────────────────────────────────────
+# Appium และ drivers ถูก manage ผ่าน node_modules (local) ไม่ใช่ global
+# bun install จะดึง appium version ที่กำหนดใน package.json มาให้อัตโนมัติ
+# ส่วน driver + plugin จะถูก setup ผ่าน `bun run setup:drivers` ซึ่งรันหลัง bun install
+info "Installing project dependencies (appium included)..."
+bun install
+success "Dependencies installed"
+
+info "Installing Appium drivers and plugins (local)..."
+bun run setup:drivers
 
 # ── 11. WebDriverAgent build fix (ARM64) ─────────────────────────────────────
 WDA_PATH=$(find ~/.appium -name "WebDriverAgent.xcodeproj" 2>/dev/null | head -1)
@@ -212,8 +221,8 @@ info "Writing env vars to shell profile..."
 
 DEFAULT_SHELL="$(basename "${SHELL:-/bin/zsh}")"
 case "$DEFAULT_SHELL" in
-  zsh)  PROFILE="${HOME}/.zprofile" ;;
-  bash) PROFILE="${HOME}/.bash_profile" ;;
+  zsh)  PROFILE="${HOME}/.zshrc" ;;
+  bash) PROFILE="${HOME}/.bashrc" ;;
   *)    PROFILE="${HOME}/.profile" ;;
 esac
 
@@ -240,12 +249,10 @@ printf "  java:    %s\n" "$(java -version 2>&1 | head -1)"
 printf "  adb:     %s\n" "$(adb --version 2>/dev/null | head -1 || echo 'not found')"
 printf "  appium:  %s\n" "$(appium --version 2>/dev/null || echo 'not found')"
 printf "  bun:     %s\n" "$(bun --version 2>/dev/null || echo 'not found')"
-printf "  node:    %s\n" "$(node --version 2>/dev/null || echo 'not found')"
 echo ""
 success "Setup complete! Run: . $PROFILE"
 echo ""
 echo "Next steps:"
-echo "  1. . $PROFILE   # หรือ source $PROFILE ถ้าใช้ zsh/bash"
-echo "  2. bun install"
-echo "  3. Start emulator: \$ANDROID_HOME/emulator/emulator -avd Pixel_7_API_34_arm64 &"
-echo "  4. bun run test:mobile:android"
+echo "  1. source $PROFILE"
+echo "  2. bun run inspect:android   # inspect elements + run Appium server"
+echo "     bun run test:mobile:android   # run tests"

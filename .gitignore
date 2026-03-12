@@ -20,18 +20,19 @@ reports/
 # Flutter app binaries (too large for git)
 apps/
 
-# Flutter build outputs (source in flutter_app/ is tracked)
-flutter_app/build/
-flutter_app/.dart_tool/
-flutter_app/.flutter-plugins
-flutter_app/.flutter-plugins-dependencies
-flutter_app/pubspec.lock
 
 # Build / output
 out
 dist
 *.tgz
 *.tsbuildinfo
+
+# appium-mcp local config (machine-specific paths)
+.mcp-screenshots/
+
+# Appium + Emulator PIDs
+.appium.pid
+.emulator.pid
 
 # Logs
 *.log
@@ -42,3 +43,4 @@ dist
 
 # macOS
 .DS_Store
+package-lock.json

@@ -49,16 +49,11 @@ export default class LivingChecklistReporter extends WDIOReporter {
 
   override onTestSkip(test: TestStats) {
     const testTags = extractTagNames((test as unknown as { tags?: CucumberTag[] }).tags);
-    const isManual =
-      this.currentTags.includes('@manual') || testTags.includes('@manual');
+    const isManual = this.currentTags.includes('@manual') || testTags.includes('@manual');
     this.recordScenario(test, isManual ? 'pending' : 'skipped');
   }
 
-  private recordScenario(
-    test: TestStats,
-    status: ScenarioResult['status'],
-    errorMessage?: string
-  ) {
+  private recordScenario(test: TestStats, status: ScenarioResult['status'], errorMessage?: string) {
     const testTags = extractTagNames((test as unknown as { tags?: CucumberTag[] }).tags);
     const tags = testTags.length > 0 ? testTags : this.currentTags;
     const isManual = tags.includes('@manual');
@@ -114,6 +109,8 @@ export default class LivingChecklistReporter extends WDIOReporter {
     await writeFile(htmlPath, html, 'utf-8');
 
     console.log(`\n📋 Living Checklist: ${htmlPath}`);
-    console.log(`   Release: ${record.tag}  |  Passed: ${record.summary.passed}/${record.summary.total}`);
+    console.log(
+      `   Release: ${record.tag}  |  Passed: ${record.summary.passed}/${record.summary.total}`,
+    );
   }
 }

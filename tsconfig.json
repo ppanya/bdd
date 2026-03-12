@@ -14,7 +14,7 @@
     "noEmit": true,
 
     // WDIO + Cucumber global types
-    "types": ["@wdio/globals/types", "expect-webdriverio", "node"],
+    "types": ["@wdio/globals/types", "expect-webdriverio", "node", "@wdio/cucumber-framework"],
 
     // Best practices
     "strict": true,

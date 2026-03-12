@@ -1,0 +1,11 @@
+{
+  "android": {
+    "platformName": "Android",
+    "appium:automationName": "UiAutomator2",
+    "appium:deviceName": "Android Emulator",
+    "appium:avd": "Pixel_7_API_34_arm64",
+    "appium:app": "apps/app-mock-release.apk",
+    "appium:newCommandTimeout": 300,
+    "appium:noReset": false
+  }
+}

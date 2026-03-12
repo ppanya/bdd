@@ -22,12 +22,15 @@ When('ฉันเรียก GET {string}', async function (this: AppWorld, pa
   this.preferCode = null;
 });
 
-When('ฉันเรียก POST {string} ด้วย:', async function (this: AppWorld, path: string, table: DataTable) {
-  const api = new BaseAPI(process.env['API_BASE_URL'] ?? 'http://localhost:4010');
-  const [body] = table.hashes() as Record<string, string>[];
-  this.lastResponse = await api.post(path, body, prismPrefer(this.preferCode));
-  this.preferCode = null;
-});
+When(
+  'ฉันเรียก POST {string} ด้วย:',
+  async function (this: AppWorld, path: string, table: DataTable) {
+    const api = new BaseAPI(process.env['API_BASE_URL'] ?? 'http://localhost:4010');
+    const [body] = table.hashes() as Record<string, string>[];
+    this.lastResponse = await api.post(path, body, prismPrefer(this.preferCode));
+    this.preferCode = null;
+  },
+);
 
 // ── Then ──────────────────────────────────────────────────────────────────────
 
