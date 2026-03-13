@@ -15,7 +15,7 @@
     "mock:test": "bun run mock & sleep 3 && bun run test:api; kill %1",
     "setup:m-series": "sh scripts/setup-m-series.sh",
     "setup:drivers": "bash scripts/setup-drivers.sh",
-    "report:checklist": "open reports/living-checklist.html",
+    "report:checklist": "bun scripts/checklist-server.ts",
     "generate:bru": "bun scripts/generate-bru.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

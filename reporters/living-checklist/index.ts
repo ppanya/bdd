@@ -85,19 +85,29 @@ export default class LivingChecklistReporter extends WDIOReporter {
     const automated = this.scenarios.filter((s) => !s.manual);
     const manual = this.scenarios.filter((s) => s.manual);
 
+    // Carry forward manual check state from the previous run (same feature+name)
+    const prevRun = history.length > 0 ? history[history.length - 1] : null;
+    const scenariosWithChecks = this.scenarios.map((s) => {
+      if (!s.manual || !prevRun) return s;
+      const prev = prevRun.scenarios.find(
+        (p) => p.name === s.name && p.feature === s.feature && p.manualCheck,
+      );
+      return prev?.manualCheck ? { ...s, manualCheck: prev.manualCheck } : s;
+    });
+
     const record: RunRecord = {
       id: randomUUID(),
       tag: this.options.releaseTag,
       timestamp: new Date().toISOString(),
-      scenarios: this.scenarios,
+      scenarios: scenariosWithChecks,
       summary: {
-        total: this.scenarios.length,
+        total: scenariosWithChecks.length,
         automated: automated.length,
         manual: manual.length,
-        passed: this.scenarios.filter((s) => s.status === 'passed').length,
-        failed: this.scenarios.filter((s) => s.status === 'failed').length,
-        skipped: this.scenarios.filter((s) => s.status === 'skipped').length,
-        pending: this.scenarios.filter((s) => s.status === 'pending').length,
+        passed: scenariosWithChecks.filter((s) => s.status === 'passed').length,
+        failed: scenariosWithChecks.filter((s) => s.status === 'failed').length,
+        skipped: scenariosWithChecks.filter((s) => s.status === 'skipped').length,
+        pending: scenariosWithChecks.filter((s) => s.status === 'pending').length,
       },
     };
 

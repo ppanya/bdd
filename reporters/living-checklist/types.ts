@@ -1,3 +1,15 @@
+export interface ManualCheck {
+  tester: string;
+  timestamp: string; // ISO 8601
+  checked: boolean;
+}
+
+export interface ReleaseSignOff {
+  tester: string;
+  timestamp: string; // ISO 8601
+  comment?: string;
+}
+
 export interface ScenarioResult {
   name: string;
   feature: string;
@@ -5,6 +17,7 @@ export interface ScenarioResult {
   manual: boolean;
   tags: string[];
   errorMessage?: string;
+  manualCheck?: ManualCheck;
 }
 
 export interface RunSummary {
@@ -27,6 +40,7 @@ export interface RunRecord {
   timestamp: string;
   scenarios: ScenarioResult[];
   summary: RunSummary;
+  signOff?: ReleaseSignOff;
 }
 
 export interface LivingChecklistOptions {
