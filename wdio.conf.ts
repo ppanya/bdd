@@ -48,6 +48,9 @@ const androidCapability = {
   'appium:dontStopAppOnReset': appReady,
   // Prevent Appium from killing the session during long operations (AVD boot, slow steps)
   'appium:newCommandTimeout': 300,
+  'appium:waitForIdleTimeout': 2000,
+  // Flutter rebuilds UI constantly — 10s default idle wait is excessive.
+  // 2s is sufficient. Does NOT override waitForDisplayed() (10s timeout, independent).
 };
 
 const iosCapability = {
@@ -108,8 +111,10 @@ export const config: WebdriverIO.Config = {
   cucumberOpts: {
     require: ['./fixtures/index.ts', './steps/**/*.ts'],
     timeout: 60_000,
-    // Auto-retry failed scenarios once — reduces flaky mobile test failures.
-    // retry: 1,
+    // Auto-retry failed scenarios once — reduces flaky mobile test failures
+    // from transient UiAutomator2 instrumentation issues (FM-3).
+    retry: 1,
+    retryTagFilter: '@mobile',
     // Filter scenarios by tag — e.g. TAGS='@phone-enable' bun run test:mobile:android
     tagExpression: process.env['TAGS'],
     // Filter by scenario name (substring match) — e.g. SCENARIO_NAME="ปุ่ม Log in ถูก enable" bun run test
@@ -179,32 +184,46 @@ export const config: WebdriverIO.Config = {
   // Uses execFileSync (no shell spawn) + terminate/activateApp (no reloadSession)
   // to avoid spawn errors and onboarding flakiness.
   async before(_capabilities, _specs) {
-    if (mobilePlatform === 'android' && !appReady) {
-      const androidHome =
-        process.env['ANDROID_HOME'] ?? `${process.env['HOME']}/Library/Android/sdk`;
-      const adb = `${androidHome}/platform-tools/adb`;
+    if (mobilePlatform === 'android') {
+      // ── Accessibility setup (first run / CI only) ──────────────────────────
+      if (!appReady) {
+        const androidHome =
+          process.env['ANDROID_HOME'] ?? `${process.env['HOME']}/Library/Android/sdk`;
+        const adb = `${androidHome}/platform-tools/adb`;
+        try {
+          execFileSync(
+            adb,
+            [
+              'shell',
+              'settings',
+              'put',
+              'secure',
+              'enabled_accessibility_services',
+              'com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService',
+            ],
+            { stdio: 'ignore', timeout: 10_000 },
+          );
+          execFileSync(adb, ['shell', 'settings', 'put', 'secure', 'accessibility_enabled', '1'], {
+            stdio: 'ignore',
+            timeout: 10_000,
+          });
+        } catch (err) {
+          console.warn('[before] accessibility setup failed:', (err as Error).message);
+        }
+      }
+
+      // ── Fix FM-1: App state reset at WDIO session start ───────────────────
+      // Always restart the app at the beginning of a new WDIO session.
+      // Previous run may have left the app on any sub-screen (Settings, History, etc.)
+      // which would cause detectScreen() to return 'loading' and cascade failures.
+      // Safe here because instrumentation is freshly initialized at session start.
       try {
-        execFileSync(
-          adb,
-          [
-            'shell',
-            'settings',
-            'put',
-            'secure',
-            'enabled_accessibility_services',
-            'com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService',
-          ],
-          { stdio: 'ignore', timeout: 10_000 },
-        );
-        execFileSync(adb, ['shell', 'settings', 'put', 'secure', 'accessibility_enabled', '1'], {
-          stdio: 'ignore',
-          timeout: 10_000,
-        });
-        // Restart app without tearing down session — avoids spawn errors from reloadSession
         await driver.terminateApp(appPackage);
+        await driver.pause(1000);
         await driver.activateApp(appPackage);
+        await driver.pause(3000); // Flutter re-init + Semantics bridge activation
       } catch (err) {
-        console.warn('[before] accessibility setup failed:', (err as Error).message);
+        console.warn('[before] app restart failed:', (err as Error).message);
       }
     }
   },

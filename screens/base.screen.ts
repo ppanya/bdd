@@ -79,21 +79,32 @@ export abstract class BaseScreen {
     });
   }
 
-  async tap(el: ChainablePromiseElement) {
-    // 1. Wait for element to be displayed
+  async tap(el: ChainablePromiseElement): Promise<void> {
     await el.waitForDisplayed({ timeout: TIMEOUTS.element });
-
-    // 2. Check if element is clickable (Flutter disabled state check)
+    // Android: clickable='false' = Flutter GestureDetector (no button Semantics)
+    // iOS: clickable attribute does not exist (returns null) → always uses el.click()
     const clickable = await el.getAttribute('clickable');
-    if (clickable === 'false') {
-      throw new Error(
-        `Element is disabled (clickable=false) — cannot tap. ` +
-          `Ensure the element is enabled before interacting.`,
-      );
-    }
 
-    // 3. Perform click
-    await el.click();
+    if (clickable === 'false') {
+      const loc = await el.getLocation();
+      const size = await el.getSize();
+      const x = Math.round(loc.x + size.width / 2);
+      const y = Math.round(loc.y + size.height / 2);
+      const platform = driver.capabilities['platformName'] as string;
+
+      if (platform === 'iOS') {
+        // XCUITest: mobile: tap at coordinates
+        // Currently unreachable (iOS does not set clickable=false), but included
+        // for future compatibility if Flutter iOS accessibility adds this attribute.
+        await driver.execute('mobile: tap', { x, y });
+      } else {
+        // Android UiAutomator2: bypass accessibility with mobile: clickGesture
+        await driver.execute('mobile: clickGesture', { x, y });
+      }
+    } else {
+      // clickable=true, null (iOS/web), or any other value → standard click
+      await el.click();
+    }
   }
 
   async setText(el: ChainablePromiseElement, text: string) {

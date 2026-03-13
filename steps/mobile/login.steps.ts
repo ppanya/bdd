@@ -91,41 +91,23 @@ When('I clear the session via DEV TOOLS', async function (this: AppWorld) {
 // ── Then ──────────────────────────────────────────────────────────────────────
 
 Then('the Log in button should be disabled', async function (this: AppWorld) {
-  await login.waitForElement(login.loginButton);
-  const clickable = await login.isLoginButtonClickable();
-  if (clickable) {
-    throw new Error('Expected Log in button to be disabled but it was enabled');
-  }
+  await expect(login.loginButton).toHaveAttribute('clickable', 'false');
 });
 
 Then('the Log in button should be enabled', async function (this: AppWorld) {
-  await login.waitForElement(login.loginButton);
-  // Use waitUntil polling — Flutter updates clickable attribute asynchronously
-  await browser.waitUntil(() => login.isLoginButtonClickable(), {
-    timeout: TIMEOUTS.element,
-    timeoutMsg: 'Expected Log in button to be enabled but it remained disabled',
-  });
+  await expect(login.loginButton).toHaveAttribute('clickable', 'true');
 });
 
 Then('I see the PDPA Consent screen', async function (this: AppWorld) {
-  const onPdpa = await pdpa.isOnPdpaScreen();
-  if (!onPdpa) {
-    throw new Error('Expected PDPA Consent screen but it was not found');
-  }
+  await expect(pdpa.title).toBeDisplayed();
 });
 
 Then('I see the Home screen', async function (this: AppWorld) {
-  const onHome = await home.isOnHomeScreen();
-  if (!onHome) {
-    throw new Error('Expected Home screen but it was not found');
-  }
+  await expect(home.homeTab).toBeDisplayed();
 });
 
 Then('I see the Set PIN screen', async function (this: AppWorld) {
-  const onPin = await pincode.isOnSetPinScreen();
-  if (!onPin) {
-    throw new Error('Expected Set PIN screen but it was not found');
-  }
+  await expect(pincode.setPinTitle).toBeDisplayed();
 });
 
 When('I set PIN {string}', async function (this: AppWorld, pin: string) {

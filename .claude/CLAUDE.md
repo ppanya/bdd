@@ -71,30 +71,11 @@ wdio.conf.ts   # WDIO configuration (replaces playwright.config.ts)
 - API suite runs without launching browser at all
 - baseURL from `API_BASE_URL` env var (default: http://localhost:4010)
 
-### Prism Mock
-
-- Prism always returns first defined response. Use `Prefer: code=XXX` header for non-2xx.
-- Step: `Given ทดสอบ error case ด้วย status {int}` sets `this.preferCode`
-- `prismPrefer(this.preferCode)` helper builds the header object
-
 ### URLs
 
 - NEVER hardcode URLs in .feature files or step definitions
 - UI tests: `browser.url('/path')` — uses `baseURL` from wdio.conf.ts → .env (BASE_URL)
 - API tests: paths only (e.g. `/api/users`) — baseURL from `API_BASE_URL` in env
-
-### Living Checklist Reporter
-
-- Appends to `reports/history.json` each run
-- Set `RELEASE_TAG=v1.0.0` env var for versioned releases
-- `@manual` tag → scenario shown as interactive checkbox in HTML report
-- `bun run report:checklist` → open `reports/living-checklist.html`
-
-### Bruno Override System
-
-- `bun run generate:bru` → regenerates `*.bru` files, NEVER touches `*.override.bru`
-- `bun run generate:bru -- --merge` → creates `*.merged.bru` (base + override combined)
-- Manual customizations go in `*.override.bru` (same basename + `.override`)
 
 ## Common Mistakes to Avoid
 
@@ -104,32 +85,11 @@ wdio.conf.ts   # WDIO configuration (replaces playwright.config.ts)
 - `browser` global not available in API steps — use `BaseAPI` (global fetch)
 - Mobile tests need Appium running — use `--suite mobile` only with emulator/device connected
 
-## Mobile App Inspection (wdio-mcp เท่านั้น)
+## Mobile App Inspection (wdio-mcp only)
 
-> ใช้ **wdio-mcp** เท่านั้น — ห้ามใช้ appium-mcp (สอง session พร้อมกันทำให้ UiAutomator2 crash)
+**Use wdio-mcp ONLY** — never use appium-mcp alongside it (two sessions crash UiAutomator2).
 
-### Setup
-
-- `.mcp.json` กำหนด MCP server
-- `capabilities.json` กำหนด base Android capabilities (Pixel_7_API_34, UiAutomator2)
-- ทั้งสองไฟล์อยู่ที่ project root
-
-### Workflow มาตรฐาน
-
-1. เปิด Android emulator ก่อน (AVD: Pixel_7_API_34_arm64)
-2. ใช้ `mcp__wdio-mcp__start_app_session` พร้อม `appPath` → เปิด app
-3. ใช้ `mcp__wdio-mcp__take_screenshot` + `mcp__wdio-mcp__get_visible_elements` → ดู element
-4. เขียน feature file + step definition + screen object จาก locators ที่ได้
-
-### วิธีเปิด DevTools (clickable=false ต้อง force gesture)
-
-```
-mcp__wdio-mcp__execute_script:
-  script: "mobile: doubleClickGesture"
-  args: [{ x: 1050, y: 1825 }]   # Pixel 7 API 34: width*0.97, height*0.78
-```
-
-### วิธีเรียก start_app_session
+### Capabilities for start_app_session
 
 ```
 platform: Android
@@ -141,32 +101,102 @@ noReset: true
 capabilities: { "appium:app": "<absolute path>/apps/app-mock-release.apk" }
 ```
 
-> path ของ APK ให้ใช้ absolute path จาก project root (ดูจาก `apps/` folder)
-
-### ตัวอย่าง prompt (ภาษาไทย)
+### Open DevTools
 
 ```
-เปิด apps/app-mock-release.apk บน Android emulator แล้ว:
-1. ถ่าย screenshot หน้าแรก
-2. generate locators ทุก element
-3. เขียน features/mobile/login.feature + steps/mobile/login.steps.ts + screens/login.screen.ts
-   ให้ตรงกับ UI ที่เห็นจริงๆ
+execute_script: "mobile: doubleClickGesture"
+args: [{ "x": 1050, "y": 1825 }]   # Pixel 7 API 34: width*0.97, height*0.78
 ```
 
+### Navigate DevTools Routes
+
+**Use `click_element` only** — tap_element / clickGesture / coordinate taps do not work on route buttons.
+
 ```
-ดูหน้า dashboard ของ app แล้วเขียน feature test สำหรับ navigation ทุก tab bar item
-ใช้ Flutter ValueKey locators ถ้าเป็น Flutter app ไม่งั้นใช้ accessibility id
+# 1. Open DevTools (doubleClickGesture above)
+# 2. Scroll toward target section
+execute_script: "mobile: scrollGesture"
+  args: [{"left": 0, "top": 400, "width": 720, "height": 1400, "direction": "down", "percent": 1.5}]
+
+# 3. Click route with XPath matching both route name AND GO/PUSH
+click_element:
+  selector: //android.view.View[contains(@content-desc,'Wallet') and contains(@content-desc,'GO')]
+  scrollToView: true
+  timeout: 10000
 ```
 
-### Screen Object Pattern (สำหรับ code ที่ generate)
+Why two XPath conditions: route buttons have content-desc `emoji\nRouteName\nGO/PUSH`. The Navigator Launchpad header contains all section names, so `descriptionContains("Wallet")` matches the header first. The `and contains(@content-desc,'GO')` narrows to the actual button.
 
-- ถ้าเป็น Flutter app: ใช้ `this.flutterByKey('valuekey')` → `flutter=key("valuekey")`
-- ถ้าเป็น native: ใช้ `accessibility id` หรือ `xpath` จาก `generate_locators`
-- extend `BaseScreen` จาก `screens/base.screen.ts` เสมอ
+Scroll depth guide (percent from top):
+- Onboarding/Main: 1.5x · Auth/Guard/Wallet: 2x · Token/NFTs/Home: 2.5–3x
+- Profile/Withdrawal/Pincode: 3–3.5x · Consent/THBK/Bank/Redemption: 4–5x
 
-### Tips
+Full route map: `memory/feedback_devtools_navigation.md`
 
-- ใช้ `appium_get_page_source` เพื่อดู XML tree เต็มของหน้า
-- ใช้ `appium_scroll` + `appium_screenshot` เพื่อดู UI ที่ scroll ลงไป
-- `generate_locators` จะ suggest best locator strategy ให้อัตโนมัติ
-- `NO_UI=false` → interactive mode (debug), เปลี่ยนเป็น `true` สำหรับ CI
+### Locator Priority
+
+1. Resource-id → `byResourceId('xxx')` (most reliable)
+2. Content-desc → `byDesc('partial text')` or `byId('exact text')`
+3. XPath → last resort
+
+## The One Prompt
+
+All tool calls use `mcp__wdio-mcp__*` (server defined in `.mcp.json`).
+
+```
+Open [APP_PATH] on Android emulator and test [FEATURE_NAME]:
+
+Phase 1 — Setup
+  mcp__wdio-mcp__start_app_session:
+    platform:Android  deviceName:Pixel_7_API_34_arm64  automationName:UiAutomator2
+    appiumHost:localhost  appiumPort:4723  noReset:true
+    capabilities: {"appium:app":"<abs-path>/[APP_PATH]"}
+  Open DevTools: execute_script "mobile: doubleClickGesture" args:[{"x":1050,"y":1825}]
+  Scroll to section: execute_script "mobile: scrollGesture" args:[{...,"percent":2}]
+  Navigate: click_element
+    selector: //android.view.View[contains(@content-desc,'[ROUTE]') and contains(@content-desc,'GO')]
+    scrollToView:true  timeout:10000
+  mcp__wdio-mcp__take_screenshot → confirm correct screen
+
+Phase 2 — Explore
+  mcp__wdio-mcp__get_visible_elements → catalog locators + clickable attributes
+  mcp__wdio-mcp__scroll if needed, repeat get_visible_elements
+
+Phase 3 — Verify interactions (CRITICAL — do not skip)
+  For each interactive element:
+    mcp__wdio-mcp__click_element → take_screenshot → works?
+    else mcp__wdio-mcp__tap_element → take_screenshot
+    else mcp__wdio-mcp__execute_script "mobile: clickGesture" args:[{"x":X,"y":Y}]
+    verify nav: execute_script "mobile: getPageSource" → includes '[expected_text]'
+
+Phase 4 — Generate
+  screens/[name].screen.ts        — extend BaseScreen, getters, isOn[Name]Screen()
+  features/mobile/[name].feature  — @mobile @devtools @[name]-screen + scenarios
+  steps/mobile/[name].steps.ts    — function keyword, this: AppWorld
+  Unreliable nav steps: 3s getPageSource check + DevTools fallback
+
+Phase 4b — Cleanup tag check
+  For each sub-screen scenario: add tag → check fixtures/index.ts After hook filter
+  If tag not in filter → add: After({ tags: '... or @new-tag' }, ...)
+
+Phase 5 — Verify
+  TAGS='@[name]-screen' bun run test:mobile:android — all must pass
+```
+
+## Tag Taxonomy
+
+```
+Layer 1 — Feature-level, triggers Before hooks:
+  @mobile       → health check (required on every mobile feature)
+  @devtools     → inject test session (authenticated screens)
+  @login-screen → navigate to Login screen (login scenarios only)
+
+Layer 2 — Feature-level, screen scope (one per feature file):
+  @{screen}-screen  e.g. @wallet-screen, @profile-screen
+
+Layer 3 — Scenario-level:
+  @smoke            → critical path (CI gate)
+  @{screen}-{what}  → domain tag  e.g. @wallet-history, @profile-settings
+  * Sub-screen nav scenarios MUST also appear in fixtures/index.ts After hook filter
+    After({ tags: '@wallet-history or @profile-settings or @profile-my-profile' }, ...)
+```

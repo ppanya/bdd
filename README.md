@@ -27,7 +27,11 @@ Framework สำหรับ **Behavior-Driven Development (BDD)** ครอบ�
 18. [Config Files อธิบาย](#config-files-อธิบาย)
 19. [ดู Test Results](#ดู-test-results)
 20. [เพิ่ม Feature ใหม่](#เพิ่ม-feature-ใหม่)
-21. [Common Mistakes](#common-mistakes)
+21. [AI-Assisted Test Discovery](#ai-assisted-test-discovery)
+22. [DevTools Panel](#devtools-panel)
+23. [The One Prompt: Explore → Understand → Test](#the-one-prompt-explore--understand--test)
+24. [Tag Strategy](#tag-strategy)
+25. [Common Mistakes](#common-mistakes)
 
 ---
 
@@ -140,7 +144,7 @@ Spec Files:    6 passed, 6 total
 
 ```bash
 # [Terminal 1] Boot emulator + start Appium + install APK + clear data
-bun run start:android
+bun run android
 # Output: ✅ Android ready. Appium PID: 12345
 ```
 
@@ -155,9 +159,9 @@ bun run test:mobile:android -- --feature login
 bun run test:mobile:android -- --feature navigation
 ```
 
-สาเหตุการแยก `start:android` ออกมา:
+สาเหตุการแยก `android` ออกมา:
 
-- **`start:android`** เปิด emulator + Appium เดียวครั้ง → ประหยัด boot time
+- **`android`** เปิด emulator + Appium เดียวครั้ง → ประหยัด boot time
 - **`test:mobile:android`** รัน tests ซ้ำๆ ไม่ต้อง restart environment
 - Pre-flight checks → fail fast ถ้า emulator/Appium ไม่พร้อม
 
@@ -181,7 +185,7 @@ bun run test:mobile:android -- --feature navigation
 ### Before Every Mobile Test Session
 
 ```bash
-bun run start:android
+bun run android
 ```
 
 Script นี้จะ:
@@ -192,6 +196,14 @@ Script นี้จะ:
 4. ✓ **Clear app data** — reset สถานะเป็น Onboarding
 5. ✓ Launch app
 
+**สำหรับ automated tests** ต้องเปิด TalkBack ด้วย (Flutter Semantics bridge):
+
+```bash
+bun run emulator:test-mode   # TalkBack ON — ต้องทำก่อนรัน tests
+# หรือ
+bun run emulator:interactive # TalkBack OFF — สำหรับ manual use / wdio-mcp exploration
+```
+
 ถ้า emulator / Appium รันอยู่แล้ว จะข้ามขั้นตอนนั้น → เร็ว
 
 ### Verify Setup
@@ -201,7 +213,7 @@ Script นี้จะ:
 bun run test:web
 bun run test:api
 
-# Mobile tests (after bun run start:android)
+# Mobile tests (after bun run android)
 bun run test:mobile:android
 ```
 
@@ -212,16 +224,15 @@ bun run test:mobile:android
 ```
 bdd/
 ├── features/                         # ① เขียนก่อนเสมอ — Gherkin (.feature files)
-│   ├── ui/
+│   ├── web/
 │   │   └── login.feature             # Web UI scenarios
 │   ├── api/
 │   │   └── users.feature             # API scenarios
 │   └── mobile/
-│       ├── login.feature             # Login flow (Email tab, PDPA consent)
-│       └── navigation.feature        # Bottom navigation bar
+│       └── login.feature             # Login flow (Email tab, PDPA consent, PIN)
 │
 ├── steps/                            # ② Step definitions — เชื่อม Gherkin กับ code
-│   ├── ui/
+│   ├── web/
 │   │   └── login.steps.ts
 │   ├── api/
 │   │   └── users.steps.ts
@@ -233,10 +244,12 @@ bdd/
 │
 ├── screens/                          # ④ Screen Objects (Mobile) — Appium selectors
 │   ├── base.screen.ts                # abstract: waitForElement/tap/scroll/swipe
+│   ├── devtools.screen.ts            # DEV TOOLS panel — session inject + 57-route nav
 │   ├── login.screen.ts               # Email/Phone login, PDPA
 │   ├── onboarding.screen.ts          # Onboarding / welcome screen
 │   ├── home.screen.ts                # Home + bottom navigation
-│   └── pdpa.screen.ts                # PDPA Consent screen
+│   ├── pdpa.screen.ts                # PDPA Consent screen
+│   └── pincode.screen.ts             # Set PIN / Confirm PIN
 │
 ├── fixtures/
 │   └── index.ts                      # Cucumber World class + Before/After hooks
@@ -245,8 +258,15 @@ bdd/
 │   ├── api/
 │   │   ├── base-api.ts               # standalone fetch wrapper (no browser)
 │   │   └── client.ts                 # re-export alias
-│   └── data/
-│       └── users.data.ts             # test data constants
+│   ├── data/
+│   │   └── users.data.ts             # test data constants
+│   ├── env.config.ts                 # centralised env var access
+│   ├── mobile-gestures.ts            # reusable Appium gesture helpers
+│   ├── context-switcher.ts           # native ↔ webview context switching
+│   └── logger.ts                     # Winston logger (debug output)
+│
+├── discovery/                        # AI-generated screen catalog (auto-created)
+│   └── screenshots/                  # per-route screenshots from wdio-mcp discovery
 │
 ├── reporters/
 │   └── living-checklist/
@@ -272,6 +292,8 @@ bdd/
 │   └── living-checklist.html         # interactive HTML report
 │
 ├── apps/                             # (gitignored) APK / .app binaries
+├── capabilities.json                 # base Appium Android capabilities (wdio-mcp)
+├── .mcp.json                         # wdio-mcp MCP server configuration
 ├── openapi.yaml                      # OpenAPI 3.0 spec — source of truth ของ API
 ├── wdio.conf.ts                      # WDIO configuration
 ├── tsconfig.json
@@ -334,7 +356,7 @@ TAGS='@smoke' bun run test
 TAGS='not @manual' bun run test:web
 
 # ── Mobile Environment ──────────────────────────────────────
-bun run start:android          # boot emulator + start Appium + install APK (ครั้งเดียวต่อ session)
+bun run android          # boot emulator + start Appium + install APK (ครั้งเดียวต่อ session)
 
 # ── Mobile Test Selection ───────────────────────────────────
 # รัน feature เฉพาะ (ชื่อ หรือ path)
@@ -369,8 +391,10 @@ bun run generate:bru -- --merge  # สร้าง *.merged.bru (base + override
 # ── Setup ──────────────────────────────────────────────────
 bun run setup:m-series         # bootstrap Apple Silicon (JDK, Android SDK, Appium)
 bun run setup:drivers          # ติดตั้ง Appium drivers (UiAutomator2, XCUITest)
-bun run inspect:android        # เปิด Appium Inspector สำหรับ Android
-bun run inspect:ios            # เปิด Appium Inspector สำหรับ iOS
+
+# ── Emulator Mode ───────────────────────────────────────────
+bun run emulator:interactive   # TalkBack OFF — ใช้ emulator ปกติ (manual / wdio-mcp)
+bun run emulator:test-mode     # TalkBack ON  — เปิด Flutter Semantics bridge (ก่อนรัน tests)
 
 # ── Code Quality ───────────────────────────────────────────
 bun run format                 # format ทุกไฟล์ (.ts, .feature, .json, .yaml)
@@ -419,7 +443,7 @@ API_BASE_URL=https://api.staging.myapp.com
 
 ## เขียน Feature File
 
-Feature files อยู่ใน `features/ui/`, `features/api/`, `features/mobile/`
+Feature files อยู่ใน `features/web/`, `features/api/`, `features/mobile/`
 
 ### โครงสร้างพื้นฐาน
 
@@ -473,7 +497,7 @@ When ฉันเรียก POST "/api/users" ด้วย:
 
 ## เขียน Step Definitions
 
-Step files อยู่ใน `steps/ui/`, `steps/api/`, `steps/mobile/`
+Step files อยู่ใน `steps/web/`, `steps/api/`, `steps/mobile/`
 
 > **กฎ:** ใช้ `function` keyword เสมอ (ไม่ใช่ arrow function) เพื่อให้ `this` เป็น `AppWorld`
 
@@ -582,13 +606,21 @@ export class LoginScreen extends BaseScreen {
 
 Screen objects ที่มีอยู่:
 
-| File                   | หน้า                                               |
-| ---------------------- | -------------------------------------------------- |
-| `base.screen.ts`       | Abstract base — waitForElement, tap, scroll, swipe |
-| `onboarding.screen.ts` | Welcome / onboarding screen                        |
-| `login.screen.ts`      | Email tab, Phone tab, Login button                 |
-| `pdpa.screen.ts`       | PDPA Consent — accept button                       |
-| `home.screen.ts`       | Home screen + bottom navigation bar                |
+| File                    | หน้า                                                      |
+| ----------------------- | --------------------------------------------------------- |
+| `base.screen.ts`        | Abstract base — waitForElement, tap, scroll, swipe        |
+| `devtools.screen.ts`    | DEV TOOLS panel — inject session, navigate 61 routes      |
+| `onboarding.screen.ts`  | Welcome / onboarding screen                               |
+| `login.screen.ts`       | Email tab, Phone tab, Login button                        |
+| `pdpa.screen.ts`        | PDPA Consent — accept button                              |
+| `home.screen.ts`        | Home screen + bottom navigation bar                       |
+| `pincode.screen.ts`     | Set PIN + Confirm PIN (6-digit entry)                     |
+| `wallet.screen.ts`      | Wallet tab — Crypto/THBK tabs, Token list, quick actions  |
+| `history.screen.ts`     | Crypto History — Token/NFT/Point tabs, transaction rows   |
+| `profile-menu.screen.ts`| Profile menu — app_menu_* resource-ids, View Profile      |
+| `settings.screen.ts`    | Application Setting — Appearances, Languages              |
+| `my-profile.screen.ts`  | Profile Information — masking toggle, phone/email rows    |
+| `nft-collection.screen.ts` | NFT Collections — wallet address, empty state          |
 
 Flutter app ต้องมี `Semantics(identifier: '...')` ครอบ widget:
 
@@ -656,7 +688,7 @@ Mobile testing แยกออกเป็น 2 ขั้นตอนชัด�
 **ขั้น 1 — เตรียม environment (ทำครั้งเดียวต่อ session)**
 
 ```bash
-bun run start:android
+bun run android
 ```
 
 script นี้จะ:
@@ -696,18 +728,18 @@ bun run test:mobile:android -- --feature login --scenario "เข้าสู่
 
 ```
 ❌ No Android emulator connected.
-   Run first:  bun run start:android
+   Run first:  bun run android
 ```
 
 ### APP_READY — skip reinstall + data cleared
 
 `run-mobile-tests.sh` ตั้ง `APP_READY=true` อัตโนมัติ → WDIO ข้ามการ reinstall APK
-(เพราะ `start:android` ติดตั้ง + clear data ให้แล้ว):
+(เพราะ `android` ติดตั้ง + clear data ให้แล้ว):
 
 **ผลข้าง ๆ**:
 
 - `adb install -r` ตั้ง `noReset: true` → เร็ว ไม่ต้อง reinstall
-- `pm clear <package>` ใน `start:android` → ทุกครั้ง reset app state → tests เริ่มจาก Onboarding เสมอ
+- `pm clear <package>` ใน `android` → ทุกครั้ง reset app state → tests เริ่มจาก Onboarding เสมอ
 - ไม่มี stale data จากรอบ test ก่อนหน้า
 
 ```bash
@@ -726,12 +758,15 @@ APP_READY=false bun run test:mobile:android
 
 ### Appium Inspector
 
-ใช้ inspect UI element บน emulator/simulator ที่รันอยู่:
+ใช้ inspect UI element บน emulator ที่รันอยู่ — เปิด Appium Inspector app แล้วตั้งค่า:
 
-```bash
-bun run inspect:android   # เปิด Inspector สำหรับ Android
-bun run inspect:ios       # เปิด Inspector สำหรับ iOS
 ```
+Remote Host: localhost
+Remote Port: 4723
+Desired Capabilities: (copy จาก capabilities.json ที่ project root)
+```
+
+> หรือใช้ **wdio-mcp** ใน Claude Code แทน Appium Inspector (เร็วกว่า, ไม่ต้องเปิด app):
 
 ---
 
@@ -851,7 +886,7 @@ export const config = {
   specs: ['./features/**/*.feature'],
 
   suites: {
-    web:    ['./features/ui/**/*.feature'],
+    web:    ['./features/web/**/*.feature'],
     api:    ['./features/api/**/*.feature'],
     mobile: ['./features/mobile/**/*.feature'],
   },
@@ -930,7 +965,7 @@ bun run report:checklist
 
 ```bash
 # 1. สร้าง feature file
-touch features/ui/checkout.feature
+touch features/web/checkout.feature
 
 # 2. เขียน scenarios ก่อน (BDD: write feature first)
 
@@ -938,7 +973,7 @@ touch features/ui/checkout.feature
 touch pages/checkout.page.ts
 
 # 4. สร้าง step definitions
-touch steps/ui/checkout.steps.ts
+touch steps/web/checkout.steps.ts
 
 # 5. รัน
 bun run test:web
@@ -966,13 +1001,13 @@ bun run test:api
 
 ```bash
 # 1. เตรียม environment (ถ้ายังไม่ได้ทำ)
-bun run start:android
+bun run android
 
 # 2. สร้าง feature file
 touch features/mobile/checkout.feature
 
-# 3. Inspect UI ด้วย Appium Inspector เพื่อหา accessibility identifiers
-bun run inspect:android
+# 3. Inspect UI ด้วย wdio-mcp ใน Claude Code หรือ Appium Inspector app
+#    ดู capabilities.json ที่ project root สำหรับ Appium Inspector settings
 
 # 4. สร้าง Screen Object (ถ้ามีหน้าใหม่)
 touch screens/checkout.screen.ts
@@ -988,6 +1023,336 @@ bun run test:mobile:android -- --feature checkout
 # 7. รัน ทั้งหมด
 bun run test:mobile:android
 ```
+
+---
+
+## AI-Assisted Test Discovery
+
+Framework รองรับ workflow ที่ให้ AI (Claude) ใช้ **wdio-mcp** เพื่อเปิด app, navigate ทุกหน้า, screenshot + inspect elements, แล้ว generate screen objects และ feature files อัตโนมัติ
+
+### Prerequisites
+
+```bash
+# 1. Boot emulator + start Appium
+bun run android
+
+# 2. Enable TalkBack (Flutter Semantics bridge ต้องการ accessibility)
+adb shell settings put secure enabled_accessibility_services \
+  com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService
+adb shell settings put secure accessibility_enabled 1
+```
+
+### วิธี Trigger Discovery
+
+พิมพ์ prompt ภาษาไทยให้ Claude:
+
+```
+เปิด apps/app-mock-release.apk บน Android emulator แล้ว:
+1. ถ่าย screenshot หน้าแรก
+2. generate locators ทุก element
+3. เขียน features/mobile/checkout.feature + steps/mobile/checkout.steps.ts + screens/checkout.screen.ts
+   ให้ตรงกับ UI ที่เห็นจริงๆ
+```
+
+```
+ดูหน้า dashboard ของ app แล้วเขียน feature test สำหรับ navigation ทุก tab bar item
+ใช้ UiAutomator2 resource-id locators
+```
+
+### Discovery Protocol (Claude ทำอัตโนมัติ)
+
+1. **start_app_session** — เปิด app บน emulator
+2. **take_screenshot + get_visible_elements** — catalog elements ทุกหน้า
+3. **execute_script `mobile: doubleClickGesture`** — เปิด DEV TOOLS (clickable=false bypass)
+4. **Inject session** — เพื่อเข้าถึง authenticated screens
+5. **Crawl 57 routes** — ถ่าย screenshot + record elements ต่อหน้า
+6. **Generate artifacts** — screen objects + feature files + step definitions
+
+### ผลที่ได้
+
+| Artifact | ที่เก็บ |
+| -------- | ------- |
+| Screenshots | `discovery/screenshots/{route}.png` |
+| Screen objects | `screens/{name}.screen.ts` |
+| Feature files | `features/mobile/{name}.feature` |
+| Step definitions | `steps/mobile/{name}.steps.ts` |
+
+> **หมายเหตุ:** ใช้ **wdio-mcp เท่านั้น** — ห้ามใช้ appium-mcp ควบคู่ (สอง session ทำให้ UiAutomator2 crash)
+
+---
+
+## DevTools Panel
+
+App มี DEV TOOLS overlay ที่ให้ navigate ไปยัง 57 screens ได้โดยตรง ใช้สำหรับ testing authenticated screens โดยไม่ต้อง login จริง
+
+### วิธีเปิด
+
+DEV TOOLS button มี `clickable=false` (Flutter intentional) — ต้องใช้ gesture แทน tap:
+
+```typescript
+// wdio-mcp: doubleClickGesture bypasses clickable=false
+await driver.executeScript('mobile: doubleClickGesture', [{ x: 1050, y: 1825 }]);
+// Pixel 7 API 34 coordinates: x = width * 0.97, y = height * 0.78
+```
+
+ใน screen object ใช้ `devtools.open()`:
+
+```typescript
+const devTools = new DevToolsScreen();
+await devTools.open(); // doubleClickGesture ภายใน
+```
+
+### Session Injection
+
+```typescript
+await devTools.injectTestSession();
+// 1. ค้นหา "Select Test Token" แล้ว tap
+// 2. ค้นหา "Inject Session" แล้ว tap
+// 3. รอ home screen
+```
+
+### Navigation (57 Routes)
+
+```typescript
+// GO = replace stack (reset navigation)
+await devTools.navigateTo('Home');
+
+// PUSH = push on stack (back button ใช้ได้)
+await devTools.pushTo('Token Transfer');
+```
+
+Route สำคัญแบ่งตาม auth:
+
+| กลุ่ม | Routes |
+| ----- | ------ |
+| Pre-auth | Onboarding, Login, Signup |
+| Main tabs | Home, Wallet, DApp, Scanner |
+| Consent | TOS, PDPA, Suitability Assessment |
+| Wallet | History, Point Detail, Wrapable Token |
+| Tokens | Transfer, Review, Summary, Detail |
+| NFTs | Collection, Images, Video, Import, Receive |
+| Profile | Menu, My Profile, Settings, Theme, Language |
+| Transfers | Bank, Kub, Join, Programmable, Top Up |
+
+---
+
+## The One Prompt: Explore → Understand → Test
+
+The core insight: **one structured prompt** drives the entire lifecycle. Claude uses wdio-mcp to live-inspect the app, systematically test each interaction, identify what actually works, then generate tests grounded in verified reality.
+
+### The Prompt Template
+
+Copy this into Claude Code when you want to add tests for any new feature.
+All tool calls use **`mcp__wdio-mcp__*`** — the MCP server defined in `.mcp.json`.
+
+```
+เปิด [APP_PATH] บน Android emulator แล้วทดสอบ [FEATURE_NAME]:
+
+## Phase 1 — Setup
+mcp__wdio-mcp__start_app_session:
+  platform: Android
+  deviceName: Pixel_7_API_34_arm64
+  automationName: UiAutomator2
+  appiumHost: localhost
+  appiumPort: 4723
+  noReset: true
+  capabilities: { "appium:app": "<absolute-path>/[APP_PATH]" }
+
+Open DevTools → navigate to [SCREEN]:
+  mcp__wdio-mcp__execute_script: "mobile: doubleClickGesture"  args: [{"x":1050,"y":1825}]
+  mcp__wdio-mcp__execute_script: "mobile: scrollGesture"
+    args: [{"left":0,"top":400,"width":720,"height":1400,"direction":"down","percent":2}]
+  mcp__wdio-mcp__click_element:
+    selector: //android.view.View[contains(@content-desc,'[ROUTE_NAME]') and contains(@content-desc,'GO')]
+    scrollToView: true  timeout: 10000
+
+mcp__wdio-mcp__take_screenshot → confirm we are on the correct screen
+
+## Phase 2 — Explore (visual + structural)
+mcp__wdio-mcp__get_visible_elements → catalog every element with locator, clickable, bounds
+For scrollable screens:
+  mcp__wdio-mcp__scroll (direction: down) → mcp__wdio-mcp__get_visible_elements again
+Identify: resource-id (preferred) → content-desc → xpath
+Note: check clickable attribute — flutter buttons may be clickable=false
+
+## Phase 3 — Verify each interaction (CRITICAL)
+For every button/action that will be tested:
+  1. mcp__wdio-mcp__click_element (selector) → mcp__wdio-mcp__take_screenshot → works?
+  2. If fails: mcp__wdio-mcp__tap_element → mcp__wdio-mcp__take_screenshot
+  3. If fails: mcp__wdio-mcp__execute_script "mobile: clickGesture" args:[{"x":X,"y":Y}]
+              → mcp__wdio-mcp__take_screenshot
+  Record: which mechanism works / which silently fails
+  After each navigation: mcp__wdio-mcp__execute_script "mobile: getPageSource"
+    → verify output includes '[expected_text]'
+
+## Phase 4 — Generate artifacts
+Using ONLY verified locators and working tap mechanisms:
+  screens/[name].screen.ts  — extend BaseScreen, getters only, isOn[Name]Screen()
+  features/mobile/[name].feature  — @mobile @devtools @[name]-screen tags + scenarios
+  steps/mobile/[name].steps.ts    — function keyword, this: AppWorld, waitForElement+tap+waitForIdle
+  For unreliable nav steps: 3s getPageSource check + DevTools fallback
+
+## Phase 4b — Cleanup tag check (REQUIRED for sub-screen scenarios)
+For every scenario that navigates AWAY from the Background screen:
+  1. Add a unique scenario tag (e.g. @[name]-[action])
+  2. Check fixtures/index.ts After hook filter:
+       After({ tags: '@wallet-history or @profile-settings or @profile-my-profile' }, ...)
+  3. If the new tag is NOT in the filter → add it to the filter
+Rule: any scenario that ends on a sub-screen needs BACK navigation cleanup.
+If unsure → add the tag anyway (BACK on a root screen is harmless).
+
+## Phase 5 — Verify
+Run: TAGS='@[name]-screen' bun run test:mobile:android
+All scenarios must pass. If any fail, diagnose and fix before declaring done.
+```
+
+### Why Phase 3 Matters
+
+The wallet-history case study shows why tap verification is non-negotiable:
+
+| Element | Mechanism tried | Result | Root cause |
+|---|---|---|---|
+| Transfer button | `tap_element ~Transfer` | ✅ Opens modal | Flutter modal — works with accessibility tap |
+| History button | `tap_element ~History` | ❌ Silent fail | Flutter screen-push nav blocked by TalkBack |
+| History button | `click_element ~History` | ❌ Silent fail | Same — accessibility action insufficient |
+| History button | `execute_script clickGesture` | ❌ Silent fail | Raw touch also blocked |
+| DevTools `goTo('History')` | — | ✅ Works | Direct route injection bypasses tap entirely |
+
+**Result:** `When I tap the History button` step now: tries native tap → 3s `getPageSource` check → DevTools fallback if needed.
+Without Phase 3, the generated test would have used `tap_element` and failed silently every run.
+
+### Substitution Guide
+
+| Placeholder | Example |
+|---|---|
+| `[APP_PATH]` | `apps/app-mock-release.apk` |
+| `[FEATURE_NAME]` | `Transfer flow / NFT Collection / Profile Settings` |
+| `[SCREEN]` | `Wallet / Profile Menu / Crypto History` |
+| `[ROUTE_NAME]` | `Wallet` / `Menu` / `History` (see `DevToolsRoute` in `screens/devtools.screen.ts`) |
+| `[name]` | `transfer` / `nft` / `settings` |
+| `[expected_text]` | unique string visible in `getPageSource` on that screen |
+
+### Quick Variant — Read-Only Screens
+
+For screens with no interactive elements (display only):
+
+```
+mcp__wdio-mcp__start_app_session (same capabilities as Phase 1)
+DevTools goTo('[ROUTE]') via execute_script doubleClickGesture + click_element XPath
+mcp__wdio-mcp__take_screenshot + mcp__wdio-mcp__get_visible_elements
+Write screens/[name].screen.ts + features/mobile/[name].feature + steps/mobile/[name].steps.ts
+Skip Phase 3 (no taps — only Then/visibility checks)
+Run: TAGS='@[name]-screen' bun run test:mobile:android
+```
+
+---
+
+## Tag Strategy
+
+### Why So Many Tags?
+
+Tags serve **three distinct purposes**. Conflating them creates confusion. Understanding the three layers explains every tag in the codebase.
+
+### The 3 Layers
+
+#### Layer 1 — Environment Tags (Feature-level)
+
+These trigger `Before` hooks in `fixtures/index.ts`. They control **what setup runs before each scenario**.
+
+| Tag | Hook | What it does |
+|---|---|---|
+| `@mobile` | `Before { tags: '@mobile' }` | Health check: verify Appium session is alive |
+| `@login-screen` | `Before { tags: '@login-screen' }` | Navigate to Login screen via DevTools before each scenario |
+| `@devtools` | `Before { tags: '@devtools' }` | Inject test session token via DevTools (skip if already authenticated) |
+| `@navigation` | `Before { tags: '@navigation' }` | Full login flow once per session (for navigation tests) |
+
+**Rule: every mobile feature file needs `@mobile` at the top.** Add `@devtools` when the feature needs authentication. Add `@login-screen` only for login screen tests.
+
+#### Layer 2 — Screen Scope Tags (Feature-level)
+
+One per feature file. Identifies which screen is being tested — used for filtering runs.
+
+```
+@wallet-screen    →  features/mobile/wallet.feature
+@profile-screen   →  features/mobile/profile.feature
+@login-screen     →  features/mobile/login.feature  (doubles as Layer 1)
+```
+
+**Rule: one `@{screen}-screen` tag per feature file.**
+
+#### Layer 3 — Scenario Tags (Scenario-level)
+
+Two sub-types:
+
+**3a. Domain tags** — describe what is being tested. Used for selective runs.
+
+```
+@smoke            — critical path scenario (must always pass, run in CI)
+@wallet-tabs      — tests wallet tab switching
+@wallet-history   — tests History navigation
+@profile-settings — tests Settings navigation
+@phone-enable     — tests phone input enables submit button
+```
+
+**3b. Cleanup tags** — trigger `After` hooks that press BACK after sub-screen navigation.
+
+```
+@wallet-history       ┐
+@profile-settings     ├── After hook: BACK press + activateApp
+@profile-my-profile   ┘   (fixtures/index.ts lines 304–319)
+```
+
+These are identical to domain tags — the same tag serves both purposes.
+
+**Rule: any scenario that navigates TO a sub-screen must have a tag that matches the After hook filter.**
+
+### Decision Tree for New Tags
+
+```
+Adding a new scenario:
+│
+├── New feature file?
+│     YES → add @mobile (Layer 1) + @devtools if auth needed (Layer 1)
+│           add @{screen}-screen (Layer 2)
+│
+├── Always → add @{screen}-{what} scenario tag (Layer 3 domain)
+│            naming: kebab-case, screen prefix, describes what is tested
+│            examples: @transfer-review, @nft-collection, @settings-language
+│
+└── Navigates to sub-screen?
+      YES → ensure the tag matches After hook filter in fixtures/index.ts
+            OR add the tag to the After hook filter:
+            After({ tags: '@wallet-history or @profile-settings or @new-tag' }, ...)
+```
+
+### Filtering Runs with Tags
+
+```bash
+# Run only smoke tests
+TAGS='@smoke' bun run test:mobile:android
+
+# Run one specific scenario
+TAGS='@wallet-history' bun run test:mobile:android
+
+# Run all wallet tests
+TAGS='@wallet-screen' bun run test:mobile:android
+
+# Run everything except wip
+TAGS='not @wip' bun run test:mobile:android
+
+# Multiple conditions
+TAGS='@mobile and not @smoke' bun run test:mobile:android
+```
+
+### Complete Tag Map (current)
+
+| File | Feature-level tags | Scenario-level tags |
+|---|---|---|
+| `login.feature` | `@mobile` `@login-screen` | `@phone-disable` `@phone-enable` `@email-disable` `@email-partial` `@email-enable` `@new-user-pin` |
+| `profile.feature` | `@mobile` `@profile-screen` | `@smoke` `@profile-menu` `@profile-view-profile` `@profile-settings`* `@profile-my-profile`* |
+| `wallet.feature` | `@mobile` `@devtools` `@wallet-screen` | `@smoke` `@wallet-tabs` `@wallet-subtabs` `@wallet-actions` `@wallet-history`* |
+
+`*` = also triggers After hook cleanup (BACK press in `fixtures/index.ts`)
 
 ---
 
@@ -1051,7 +1416,7 @@ Given('step', async function (this: AppWorld) {
 bun run test:mobile:android
 
 # ✅ เตรียม environment ก่อนเสมอ (ครั้งเดียวต่อ session)
-bun run start:android
+bun run android
 bun run test:mobile:android
 ```
 
