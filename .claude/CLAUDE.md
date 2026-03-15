@@ -32,7 +32,7 @@ fixtures/      # Cucumber World class + hooks
 support/api/   # BaseAPI (global fetch, no browser)
 scripts/       # Dev utilities
 openapi.yaml   # Prism mock spec
-wdio.conf.ts   # WDIO configuration (replaces playwright.config.ts)
+wdio.conf.ts   # WDIO configuration (conditional video reporter: web only)
 ```
 
 ## Critical Rules
@@ -77,6 +77,30 @@ wdio.conf.ts   # WDIO configuration (replaces playwright.config.ts)
 - NEVER hardcode URLs in .feature files or step definitions
 - UI tests: `browser.url('/path')` — uses `baseURL` from wdio.conf.ts → .env (BASE_URL)
 - API tests: paths only (e.g. `/api/users`) — baseURL from `API_BASE_URL` in env
+
+## Reporting
+
+### Screenshots on Failure
+
+Two hooks capture screenshots — redundancy ensures capture even when sessions crash:
+
+1. **`afterTest`** in `wdio.conf.ts` — WDIO hook, wrapped in try/catch (session may be closed)
+2. **`After`** in `fixtures/index.ts` — Cucumber hook, checks session health before capture
+
+Both auto-attach to Allure report (`disableWebdriverScreenshotsReporting: false`).
+
+### Video Recording (Web Only)
+
+`wdio-video-reporter` is conditionally loaded — **disabled when `MOBILE_PLATFORM` is set**. Mobile Appium sessions crash with "socket hang up" when the video reporter takes rapid screenshots through the same WebDriver connection.
+
+- Web tests: videos saved to `reports/videos/` (failed tests only, 3x slowdown)
+- Mobile tests: screenshots only (no video)
+
+### Report Commands
+
+- **`bun run report:allure`** → serve Allure report locally (auto-opens browser)
+- **`bun run report:generate`** → build static HTML at `allure-report/` for sharing
+- **`bun run report:checklist`** → Living Checklist with release comparison + manual checkboxes
 
 ## Common Mistakes to Avoid
 
@@ -192,18 +216,18 @@ Platform separation by command, not tags:
 - `bun run test:api` → `features/api/**`
 - `bun run test:mobile:android` → `features/mobile/**`
 
-| Tag           | Purpose                                    | Scope    |
-| ------------- | ------------------------------------------ | -------- |
-| `@smoke`      | CI gate — critical path, blocks deploy     | Scenario |
-| `@regression` | Full regression — all non-smoke            | Scenario |
-| `@happy-path` | Positive/success flows                     | Scenario |
-| `@negative`   | Error, validation, edge cases              | Scenario |
-| `@boundary`   | Limits, extremes, zero values              | Scenario |
-| `@wip`        | Work in progress — excluded from CI        | Scenario |
-| `@slow`       | >30s — may exclude from fast loops         | Scenario |
-| `@flaky`      | Known unreliable — under investigation     | Scenario |
-| `@manual`     | Human verification only                    | Scenario |
-| `@skip`       | Temporarily disabled (must add reason)     | Scenario |
+| Tag                  | Purpose                                   | Scope    |
+| -------------------- | ----------------------------------------- | -------- |
+| `@smoke`             | CI gate — critical path, blocks deploy    | Scenario |
+| `@regression`        | Full regression — all non-smoke           | Scenario |
+| `@happy-path`        | Positive/success flows                    | Scenario |
+| `@negative`          | Error, validation, edge cases             | Scenario |
+| `@boundary`          | Limits, extremes, zero values             | Scenario |
+| `@wip`               | Work in progress — excluded from CI       | Scenario |
+| `@slow`              | >30s — may exclude from fast loops        | Scenario |
+| `@flaky`             | Known unreliable — under investigation    | Scenario |
+| `@manual`            | Human verification only                   | Scenario |
+| `@skip`              | Temporarily disabled (must add reason)    | Scenario |
 | `@monday=BOARD/ITEM` | Links to Monday.com card in Allure report | Scenario |
 
 > **Note:** `@monday=` tags are metadata links — they do NOT count toward the 2-tag-per-scenario limit.

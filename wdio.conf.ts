@@ -127,6 +127,9 @@ export const config: WebdriverIO.Config = {
   services: [],
 
   // ── Reporters ──────────────────────────────────────────────────────────────
+  // Video reporter disabled for mobile — rapid Appium screenshots cause
+  // "socket hang up" crashes (wdio-video-reporter takes screenshots via
+  // the same WebDriver session, overwhelming the Appium connection).
   reporters: [
     'spec',
     [
@@ -137,14 +140,18 @@ export const config: WebdriverIO.Config = {
         disableWebdriverScreenshotsReporting: false,
       },
     ],
-    [
-      video,
-      {
-        saveAllVideos: false, // only save videos for failed tests
-        videoSlowdownMultiplier: 3, // 3x slower playback for review
-        outputDir: 'reports/videos',
-      },
-    ],
+    ...(!mobilePlatform
+      ? ([
+          [
+            video,
+            {
+              saveAllVideos: false, // only save videos for failed tests
+              videoSlowdownMultiplier: 3, // 3x slower playback for review
+              outputDir: 'reports/videos',
+            },
+          ],
+        ] as WebdriverIO.Config['reporters'])
+      : []),
   ],
 
   // ── Appium connection (mobile suites) ─────────────────────────────────────
@@ -233,7 +240,12 @@ export const config: WebdriverIO.Config = {
   // disableWebdriverScreenshotsReporting is false.
   async afterTest(_test, _context, result) {
     if (result.error) {
-      await driver.takeScreenshot();
+      try {
+        await driver.takeScreenshot();
+      } catch {
+        // Session may be closed (app crash, Appium timeout) — screenshot skipped.
+        // Cucumber After hook in fixtures/index.ts provides a second attempt.
+      }
     }
   },
 };

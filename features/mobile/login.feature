@@ -45,7 +45,6 @@ Feature: Login on Mobile (KUB Wallet)
     When I enter email "test@example.com"
     And I enter password "P@ssw0rd123"
     And I tap the Log in button
-    And I accept PDPA if prompted
     Then I see the Set PIN screen
     And I set PIN "123456"
     Then I see the Home screen

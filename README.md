@@ -11,27 +11,29 @@ Framework สำหรับ **Behavior-Driven Development (BDD)** ครอบ�
 2. [Stack](#stack)
 3. [Prerequisites](#prerequisites)
 4. [Quick Start](#quick-start)
-5. [โครงสร้างโปรเจค](#โครงสร้างโปรเจค)
-6. [Workflow การทำงาน](#workflow-การทำงาน)
-7. [Scripts](#scripts)
-8. [Environment Variables](#environment-variables)
-9. [เขียน Feature File](#เขียน-feature-file)
-10. [เขียน Step Definitions](#เขียน-step-definitions)
-11. [Page & Screen Objects](#page--screen-objects)
-12. [API Testing](#api-testing)
-13. [Mobile Testing](#mobile-testing)
-14. [Cucumber World](#cucumber-world)
-15. [Mock API ด้วย Prism](#mock-api-ด้วย-prism)
-16. [Bruno API Collection](#bruno-api-collection)
-17. [Living Checklist Reporter](#living-checklist-reporter)
-18. [Config Files อธิบาย](#config-files-อธิบาย)
-19. [ดู Test Results](#ดู-test-results)
-20. [เพิ่ม Feature ใหม่](#เพิ่ม-feature-ใหม่)
-21. [AI-Assisted Test Discovery](#ai-assisted-test-discovery)
-22. [DevTools Panel](#devtools-panel)
-23. [The One Prompt: Explore → Understand → Test](#the-one-prompt-explore--understand--test)
-24. [Tag Strategy](#tag-strategy)
-25. [Common Mistakes](#common-mistakes)
+5. [How to Read This Project](#how-to-read-this-project)
+6. [โครงสร้างโปรเจค](#โครงสร้างโปรเจค)
+7. [Workflow การทำงาน](#workflow-การทำงาน)
+8. [Scripts](#scripts)
+9. [Environment Variables](#environment-variables)
+10. [เขียน Feature File](#เขียน-feature-file)
+11. [เขียน Step Definitions](#เขียน-step-definitions)
+12. [Page & Screen Objects](#page--screen-objects)
+13. [API Testing](#api-testing)
+14. [Mobile Testing](#mobile-testing)
+15. [Cucumber World](#cucumber-world)
+16. [Mock API ด้วย Prism](#mock-api-ด้วย-prism)
+17. [Bruno API Collection](#bruno-api-collection)
+18. [Living Checklist Reporter](#living-checklist-reporter)
+19. [Config Files อธิบาย](#config-files-อธิบาย)
+20. [ดู Test Results](#ดู-test-results)
+21. [เพิ่ม Feature ใหม่](#เพิ่ม-feature-ใหม่)
+22. [AI-Assisted Test Discovery](#ai-assisted-test-discovery)
+23. [DevTools Panel](#devtools-panel)
+24. [The One Prompt: Explore → Understand → Test](#the-one-prompt-explore--understand--test)
+25. [How to Prompt Claude](#how-to-prompt-claude)
+26. [Tag Strategy](#tag-strategy)
+27. [Common Mistakes](#common-mistakes)
 
 ---
 
@@ -216,6 +218,40 @@ bun run test:api
 # Mobile tests (after bun run android)
 bun run test:mobile:android
 ```
+
+---
+
+## How to Read This Project
+
+New to the codebase? Follow this reading order to build a mental model:
+
+| Order | Directory             | What you'll learn                                                           |
+| ----- | --------------------- | --------------------------------------------------------------------------- |
+| 1     | `features/`           | **WHAT** is tested — read Gherkin scenarios to understand business behavior |
+| 2     | `steps/`              | **HOW** scenarios map to code — each `.steps.ts` implements Given/When/Then |
+| 3     | `pages/` / `screens/` | **WHERE** elements live — locators and interaction methods                  |
+| 4     | `fixtures/`           | **LIFECYCLE** — World class (shared state) + Before/After hooks             |
+| 5     | `support/`            | **HELPERS** — API client, mobile gestures, screen detection, logger         |
+| 6     | `wdio.conf.ts`        | **RUNTIME** — capabilities, reporters, services, timeouts                   |
+
+**Recommended first read:** Pick any `.feature` file → find its matching `.steps.ts` → find the page/screen object it uses → run it.
+
+```bash
+# Example: trace the login flow end-to-end
+# 1. Read the scenario
+cat features/mobile/login.feature
+
+# 2. Read the step definitions
+cat steps/mobile/login.steps.ts
+
+# 3. Read the screen object
+cat screens/login.screen.ts
+
+# 4. Run it
+TAGS='@phone-enable' bun run test:mobile:android
+```
+
+The pattern is always: **Feature → Steps → Page/Screen → Run**.
 
 ---
 
@@ -938,24 +974,75 @@ bun run test:mobile:android   # MOBILE_PLATFORM=android + APP_READY=true + --sui
 
 ## ดู Test Results
 
-### Terminal (spec reporter)
+### Terminal — Spec Reporter
 
-ผลแสดงทันทีระหว่างรัน — pass/fail ต่อ scenario
+The spec reporter prints real-time results during the run. Each step shows ✓ (pass) or ✗ (fail) with duration:
+
+```
+[chrome]  ✓ Given ฉันอยู่ที่หน้า Login (1.2s)
+[chrome]  ✓ When ฉันกรอกชื่อผู้ใช้ว่า "alice" (0.3s)
+[chrome]  ✓ Then ฉันควรเห็นหน้า Dashboard (0.8s)
+
+3 passing (2.3s)
+```
 
 ### Allure Report
 
+Rich HTML report with screenshots, step timeline, environment info, and historical trends.
+
 ```bash
-# ต้องติดตั้ง allure CLI ก่อน
+# Install Allure CLI (one-time)
 brew install allure
-allure serve allure-results
+
+# Serve report from latest test results (auto-opens browser)
+bun run report:allure
+
+# Or generate static HTML for sharing (output: allure-report/)
+bun run report:generate
 ```
+
+**What's inside:**
+
+- **Overview** — pass/fail summary, duration, environment metadata
+- **Suites** — expandable test tree with step-by-step timeline
+- **Screenshots** — automatically attached on failure (see below)
+- **Categories** — failure classification (product bug vs test defect)
+- **Trends** — historical pass rate across runs (when using `allure-results` history)
+
+### Screenshot on Failure
+
+Two hooks ensure screenshots are captured even when sessions are unstable:
+
+| Hook        | Location            | When it fires                                                      |
+| ----------- | ------------------- | ------------------------------------------------------------------ |
+| `afterTest` | `wdio.conf.ts`      | After every failed test — wrapped in try/catch for session crashes |
+| `After`     | `fixtures/index.ts` | Cucumber hook — checks session health before capturing             |
+
+Screenshots are auto-attached to Allure report via `disableWebdriverScreenshotsReporting: false`.
+
+### Video Recording (Web Only)
+
+`wdio-video-reporter` records browser sessions for failed web tests. **Disabled for mobile** — rapid Appium screenshots cause "socket hang up" crashes.
+
+- Videos saved to `reports/videos/` (only failed tests, 3x slowdown for review)
+- Automatically included in Allure report for web test runs
 
 ### Living Checklist
 
+Interactive HTML report for release sign-off — compare releases, check off manual items, export results.
+
 ```bash
+# Generate and serve Living Checklist
 bun run report:checklist
-# เปิด reports/living-checklist.html ใน browser
+# Output: reports/living-checklist.html — open in browser
 ```
+
+**Features:**
+
+- Release comparison (diff between test runs)
+- Manual checkboxes for human verification items
+- Export to PDF/HTML for stakeholder sharing
+- Auto-save progress via local server
 
 ---
 
@@ -1244,6 +1331,76 @@ Write screens/[name].screen.ts + features/mobile/[name].feature + steps/mobile/[
 Skip Phase 3 (no taps — only Then/visibility checks)
 Run: TAGS='@[name]-screen' bun run test:mobile:android
 ```
+
+---
+
+## How to Prompt Claude
+
+This section is for **Claude Code** users. Claude can explore the live app, write tests, debug failures, and inspect elements — all through natural language prompts.
+
+### Prerequisites
+
+Before prompting, ensure:
+
+1. **Emulator is running**: `bun run android` (boots emulator + Appium + installs APK)
+2. **Appium is alive**: check with `curl http://localhost:4723/status`
+3. **TalkBack is ON**: `bun run emulator:test-mode` (required for Flutter Semantics)
+
+### Prompt Examples by Task
+
+#### Explore a New Screen
+
+```
+เปิด apps/app-mock-release.apk บน Android แล้วไปที่หน้า Wallet
+ดู elements ทั้งหมดที่อยู่บนหน้า — resource-id, content-desc, clickable
+ลอง tap แต่ละ button แล้วบอกว่าอันไหนทำงาน
+```
+
+#### Write Tests for an Existing Screen
+
+```
+เขียน mobile test สำหรับหน้า Transfer:
+- สร้าง screen object (screens/transfer.screen.ts)
+- สร้าง feature file (features/mobile/transfer.feature) ใช้ @smoke + @happy-path
+- สร้าง step definitions (steps/mobile/transfer.steps.ts)
+- รัน TAGS='@smoke' bun run test:mobile:android ให้ผ่าน
+```
+
+#### Debug a Failing Test
+
+```
+รัน TAGS='@wallet-history' bun run test:mobile:android แล้วดูว่า fail ตรงไหน
+เปิด app แล้วไปที่หน้า Wallet History ลอง reproduce ปัญหา
+แก้ไขแล้วรันใหม่จนผ่าน
+```
+
+#### Inspect Elements Without Writing Tests
+
+```
+เปิด app แล้วไปที่หน้า PDPA Consent
+screenshot + get_visible_elements แล้วบอก:
+- elements ทั้งหมดพร้อม locator strategy
+- อันไหน clickable / อันไหนไม่
+- แนะนำ locator ที่ดีที่สุดสำหรับแต่ละ element
+```
+
+#### Quick English Prompts
+
+```
+Open the app, navigate to Home screen via DevTools, take a screenshot and list all elements.
+
+Write @smoke tests for the Profile screen. Use existing patterns from wallet.feature as reference.
+
+The @email-enable test is flaky — investigate and fix.
+```
+
+### Tips for Better Prompts
+
+- **Be specific about the screen name** — use route names from DevTools (e.g., "Wallet", "Menu", "History")
+- **Mention tag strategy** — "@smoke + @happy-path" tells Claude exactly how to tag scenarios
+- **Reference existing patterns** — "use the same pattern as login.steps.ts" grounds the output
+- **Ask for verification** — "รันจนผ่าน" ensures Claude runs tests, not just writes them
+- **One screen per prompt** — keep prompts focused for best results
 
 ---
 
