@@ -25,16 +25,36 @@ export class PincodeScreen extends BaseScreen {
 
   // ── Digit keys ────────────────────────────────────────────────────────────────
 
-  get key0() { return this.byResourceId('pin_0'); }
-  get key1() { return this.byResourceId('pin_1'); }
-  get key2() { return this.byResourceId('pin_2'); }
-  get key3() { return this.byResourceId('pin_3'); }
-  get key4() { return this.byResourceId('pin_4'); }
-  get key5() { return this.byResourceId('pin_5'); }
-  get key6() { return this.byResourceId('pin_6'); }
-  get key7() { return this.byResourceId('pin_7'); }
-  get key8() { return this.byResourceId('pin_8'); }
-  get key9() { return this.byResourceId('pin_9'); }
+  get key0() {
+    return this.byResourceId('pin_0');
+  }
+  get key1() {
+    return this.byResourceId('pin_1');
+  }
+  get key2() {
+    return this.byResourceId('pin_2');
+  }
+  get key3() {
+    return this.byResourceId('pin_3');
+  }
+  get key4() {
+    return this.byResourceId('pin_4');
+  }
+  get key5() {
+    return this.byResourceId('pin_5');
+  }
+  get key6() {
+    return this.byResourceId('pin_6');
+  }
+  get key7() {
+    return this.byResourceId('pin_7');
+  }
+  get key8() {
+    return this.byResourceId('pin_8');
+  }
+  get key9() {
+    return this.byResourceId('pin_9');
+  }
 
   /** Backspace — no resource-id; second ImageView on screen */
   get backspaceKey() {
@@ -68,9 +88,15 @@ export class PincodeScreen extends BaseScreen {
   /** Tap a single digit key */
   async tapDigit(digit: string): Promise<void> {
     const keyMap: Record<string, ChainablePromiseElement> = {
-      '0': this.key0, '1': this.key1, '2': this.key2,
-      '3': this.key3, '4': this.key4, '5': this.key5,
-      '6': this.key6, '7': this.key7, '8': this.key8,
+      '0': this.key0,
+      '1': this.key1,
+      '2': this.key2,
+      '3': this.key3,
+      '4': this.key4,
+      '5': this.key5,
+      '6': this.key6,
+      '7': this.key7,
+      '8': this.key8,
       '9': this.key9,
     };
     const key = keyMap[digit];

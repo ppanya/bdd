@@ -1,16 +1,10 @@
-import { execSync, execFileSync } from 'node:child_process';
-import LivingChecklistReporter from './reporters/living-checklist/index.ts';
+import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+// @ts-expect-error — wdio-video-reporter types exist but package.json "exports" prevents resolution
+import video from 'wdio-video-reporter';
+import logger from './support/logger.ts';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-
-function getReleaseTag(): string {
-  if (process.env['RELEASE_TAG']) return process.env['RELEASE_TAG'];
-  try {
-    return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim();
-  } catch {
-    return 'untagged';
-  }
-}
 
 const isArm64 = process.arch === 'arm64';
 
@@ -109,12 +103,15 @@ export const config: WebdriverIO.Config = {
   // ── Framework ──────────────────────────────────────────────────────────────
   framework: '@wdio/cucumber-framework',
   cucumberOpts: {
-    require: ['./fixtures/index.ts', './steps/**/*.ts'],
+    require: [
+      './fixtures/index.ts',
+      ...(mobilePlatform ? ['./fixtures/mobile.hooks.ts'] : []),
+      './steps/**/*.ts',
+    ],
     timeout: 60_000,
     // Auto-retry failed scenarios once — reduces flaky mobile test failures
     // from transient UiAutomator2 instrumentation issues (FM-3).
     retry: 1,
-    retryTagFilter: '@mobile',
     // Filter scenarios by tag — e.g. TAGS='@phone-enable' bun run test:mobile:android
     tagExpression: process.env['TAGS'],
     // Filter by scenario name (substring match) — e.g. SCENARIO_NAME="ปุ่ม Log in ถูก enable" bun run test
@@ -141,10 +138,11 @@ export const config: WebdriverIO.Config = {
       },
     ],
     [
-      LivingChecklistReporter,
+      video,
       {
-        outputDir: 'reports',
-        releaseTag: getReleaseTag(),
+        saveAllVideos: false, // only save videos for failed tests
+        videoSlowdownMultiplier: 3, // 3x slower playback for review
+        outputDir: 'reports/videos',
       },
     ],
   ],
@@ -171,9 +169,12 @@ export const config: WebdriverIO.Config = {
 
   // ── Hooks ──────────────────────────────────────────────────────────────────
   onPrepare(_config, capabilities) {
+    // Shared run ID so the reporter can merge results from multiple spec-file workers
+    process.env['WDIO_RUN_ID'] = randomUUID();
+
     const cap = Array.isArray(capabilities) ? capabilities[0] : capabilities;
     const platform = (cap as Record<string, unknown>)?.['platformName'] ?? 'web';
-    console.log(`\n▶ WDIO run  platform=${platform}  release=${getReleaseTag()}\n`);
+    logger.info('WDIO run', { platform });
   },
 
   // Enable Android accessibility so Flutter builds its Semantics tree.
@@ -208,7 +209,7 @@ export const config: WebdriverIO.Config = {
             timeout: 10_000,
           });
         } catch (err) {
-          console.warn('[before] accessibility setup failed:', (err as Error).message);
+          logger.warn('[before] accessibility setup failed', { error: (err as Error).message });
         }
       }
 
@@ -223,8 +224,16 @@ export const config: WebdriverIO.Config = {
         await driver.activateApp(appPackage);
         await driver.pause(3000); // Flutter re-init + Semantics bridge activation
       } catch (err) {
-        console.warn('[before] app restart failed:', (err as Error).message);
+        logger.warn('[before] app restart failed', { error: (err as Error).message });
       }
+    }
+  },
+
+  // Capture screenshot on failure — Allure reporter auto-attaches when
+  // disableWebdriverScreenshotsReporting is false.
+  async afterTest(_test, _context, result) {
+    if (result.error) {
+      await driver.takeScreenshot();
     }
   },
 };

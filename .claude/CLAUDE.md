@@ -15,6 +15,8 @@
 - **`bun run test:mobile:android`** / **`bun run test:mobile:ios`** → Appium + Flutter
 - **`bun run mock`** → start Prism mock on :4010 before API tests
 - **`bun run mock:test`** → Prism + API tests in one command
+- **`bun run report:allure`** → serve Allure report locally (auto-opens browser)
+- **`bun run report:generate`** → build static HTML at `allure-report/` for sharing
 
 ## Architecture
 
@@ -28,7 +30,6 @@ pages/         # Page Objects (WDIO $() selectors)
 screens/       # Screen Objects (Appium + Flutter ValueKey)
 fixtures/      # Cucumber World class + hooks
 support/api/   # BaseAPI (global fetch, no browser)
-reporters/     # Living Checklist custom reporter
 scripts/       # Dev utilities
 openapi.yaml   # Prism mock spec
 wdio.conf.ts   # WDIO configuration (replaces playwright.config.ts)
@@ -128,6 +129,7 @@ click_element:
 Why two XPath conditions: route buttons have content-desc `emoji\nRouteName\nGO/PUSH`. The Navigator Launchpad header contains all section names, so `descriptionContains("Wallet")` matches the header first. The `and contains(@content-desc,'GO')` narrows to the actual button.
 
 Scroll depth guide (percent from top):
+
 - Onboarding/Main: 1.5x · Auth/Guard/Wallet: 2x · Token/NFTs/Home: 2.5–3x
 - Profile/Withdrawal/Pincode: 3–3.5x · Consent/THBK/Bank/Redemption: 4–5x
 
@@ -171,32 +173,180 @@ Phase 3 — Verify interactions (CRITICAL — do not skip)
 
 Phase 4 — Generate
   screens/[name].screen.ts        — extend BaseScreen, getters, isOn[Name]Screen()
-  features/mobile/[name].feature  — @mobile @devtools @[name]-screen + scenarios
+  features/mobile/[name].feature  — @smoke/@regression + @happy-path/@negative
   steps/mobile/[name].steps.ts    — function keyword, this: AppWorld
-  Unreliable nav steps: 3s getPageSource check + DevTools fallback
-
-Phase 4b — Cleanup tag check
-  For each sub-screen scenario: add tag → check fixtures/index.ts After hook filter
-  If tag not in filter → add: After({ tags: '... or @new-tag' }, ...)
+  Given steps: call ensureAuthenticated() + DevTools navigation
+  Use ensureVisible() after keyboard/cache operations
 
 Phase 5 — Verify
-  TAGS='@[name]-screen' bun run test:mobile:android — all must pass
+  TAGS='@smoke' bun run test:mobile:android — all must pass
 ```
 
-## Tag Taxonomy
+## Tag Glossary
 
+Tags classify scenarios by priority and type. Max 2 tags per scenario.
+
+Platform separation by command, not tags:
+
+- `bun run test:web` → `features/ui/**`
+- `bun run test:api` → `features/api/**`
+- `bun run test:mobile:android` → `features/mobile/**`
+
+| Tag           | Purpose                                    | Scope    |
+| ------------- | ------------------------------------------ | -------- |
+| `@smoke`      | CI gate — critical path, blocks deploy     | Scenario |
+| `@regression` | Full regression — all non-smoke            | Scenario |
+| `@happy-path` | Positive/success flows                     | Scenario |
+| `@negative`   | Error, validation, edge cases              | Scenario |
+| `@boundary`   | Limits, extremes, zero values              | Scenario |
+| `@wip`        | Work in progress — excluded from CI        | Scenario |
+| `@slow`       | >30s — may exclude from fast loops         | Scenario |
+| `@flaky`      | Known unreliable — under investigation     | Scenario |
+| `@manual`     | Human verification only                    | Scenario |
+| `@skip`       | Temporarily disabled (must add reason)     | Scenario |
+| `@monday=BOARD/ITEM` | Links to Monday.com card in Allure report | Scenario |
+
+> **Note:** `@monday=` tags are metadata links — they do NOT count toward the 2-tag-per-scenario limit.
+
+## Prompt: Write Mobile Test
+
+### Phase 0 — Explore Screen (REQUIRED before writing code)
+
+Use wdio-mcp to discover real locators from the live app. NEVER guess element IDs.
+
+1. Start app session:
+   `mcp__wdio-mcp__start_app_session` (Android, UiAutomator2, Pixel_7_API_34_arm64)
+
+2. Navigate to target screen:
+   - Open DevTools: `execute_script "mobile: doubleClickGesture"` args:[{"x":1050,"y":1825}]
+   - Scroll + `click_element` to target route
+
+3. Catalog all elements:
+   `mcp__wdio-mcp__get_visible_elements` → record every element's:
+   - resource-id (most reliable)
+   - content-desc (compound text with \n separators)
+   - class name (android.widget.Button vs android.view.View)
+   - clickable attribute (true/false)
+   - Scroll down and repeat until all elements cataloged
+
+4. Build locator map — choose strategy per element:
+
+   | Priority | Strategy             | When to use                          | Example                                                |
+   | -------- | -------------------- | ------------------------------------ | ------------------------------------------------------ |
+   | 1 (best) | `byResourceId('id')` | Element has resource-id              | `byResourceId('login_submit_button')`                  |
+   | 2        | `byId('exact text')` | Unique exact content-desc            | `byId('Crypto Wallet')`                                |
+   | 3        | `byDesc('partial')`  | Compound content-desc with \n        | `byDesc('navigation_menu_wallet')`                     |
+   | 4 (last) | XPath                | No id, no desc, or need class filter | `$('//android.widget.Button[@content-desc="Accept"]')` |
+
+   Rules:
+   - NEVER use XPath when resource-id exists
+   - NEVER guess locators — every locator must come from get_visible_elements output
+   - For buttons with clickable=false: note in screen object (tap() handles via clickGesture)
+   - For compound content-desc: use byDesc with the stable part (before first \n)
+
+5. Verify interactions — for each interactive element:
+   `mcp__wdio-mcp__click_element` → `take_screenshot` → confirm navigation/state change
+   If click fails: try `tap_element` → then `execute_script "mobile: clickGesture"`
+
+### Phase 1 — Generate Screen Object
+
+`screens/[name].screen.ts` — extend BaseScreen:
+
+- Typed getters using locators from Phase 0
+- `isOn[Name]Screen()` method using `getPageSource().includes()`
+- Action methods (fill, tap, switch)
+
+### Phase 2 — Generate Feature File
+
+`features/mobile/[name].feature`:
+
+- Tags: `@smoke`/`@regression` + `@happy-path`/`@negative`/`@boundary`
+- Max 2 tags per scenario
+- Background step calls `Given "I am on [Screen] via DEV TOOLS"`
+- One assertion per Then step
+
+### Phase 3 — Generate Step Definitions
+
+`steps/mobile/[name].steps.ts`:
+
+- `function` keyword (never arrows) for `this: AppWorld`
+- Given steps: call `ensureAuthenticated()` + DevTools navigation
+- Use `ensureVisible()` after cache/keyboard operations
+- Re-query elements after `resetCache()`
+- No DevTools fallback for tap failures
+- No hardcoded `driver.pause()`
+
+### Phase 4 — Verify
+
+```bash
+TAGS='@smoke' bun run test:mobile:android — all must pass
 ```
-Layer 1 — Feature-level, triggers Before hooks:
-  @mobile       → health check (required on every mobile feature)
-  @devtools     → inject test session (authenticated screens)
-  @login-screen → navigate to Login screen (login scenarios only)
 
-Layer 2 — Feature-level, screen scope (one per feature file):
-  @{screen}-screen  e.g. @wallet-screen, @profile-screen
+## Prompt: Write API Test
 
-Layer 3 — Scenario-level:
-  @smoke            → critical path (CI gate)
-  @{screen}-{what}  → domain tag  e.g. @wallet-history, @profile-settings
-  * Sub-screen nav scenarios MUST also appear in fixtures/index.ts After hook filter
-    After({ tags: '@wallet-history or @profile-settings or @profile-my-profile' }, ...)
-```
+Context:
+
+- BaseAPI from `support/api/base-api.ts` (global fetch, no browser)
+- Mock server: Prism on localhost:4010 (from openapi.yaml)
+- Existing convention: Thai Gherkin steps
+- Error simulation: `Given ทดสอบ error case ด้วย status {int}` sets Prefer header
+
+Generate:
+
+1. `features/api/[name].feature` — `@smoke`/`@regression` + `@happy-path`/`@negative`
+2. `steps/api/[name].steps.ts` — reuse existing When/Then steps if applicable
+
+Reusable steps (from `steps/api/users.steps.ts`):
+
+- `When ฉันเรียก GET {string}`
+- `When ฉันเรียก POST {string} ด้วย: [DataTable]`
+- `Then status code ควรเป็น {int}`
+- `Then response ควรเป็น array`
+- `Then response ควรมี field {string}`
+
+Rules:
+
+- NEVER hardcode base URL — use `API_BASE_URL` env var
+- One scenario per behavior (success, each error case)
+- Check status, response shape, and field presence
+
+## Prompt: Write Web Test
+
+Context:
+
+- Page Object: `pages/[name].page.ts` (WDIO getter pattern, no constructor)
+- Selectors: WDIO `$()` / `$$()` — CSS/ID selectors, NOT Playwright
+- `browser` and `$` are WDIO globals — no injection needed
+- Steps use `function` keyword for `this: AppWorld`
+
+Generate:
+
+1. `pages/[name].page.ts` — WDIO getters, action methods
+2. `features/ui/[name].feature` — `@smoke`/`@regression` + `@happy-path`/`@negative`
+3. `steps/web/[name].steps.ts` — `function` keyword, `this: AppWorld`
+
+Rules:
+
+- NEVER hardcode URLs — `browser.url('/path')`, baseUrl from `.env`
+- Use `$()` selectors, NOT Playwright Locator/Page types
+- Page Objects: lazy getters, no constructor injection
+
+## Mobile Test Anti-Flakiness Rules
+
+### NEVER:
+
+1. Guess locators — always discover via wdio-mcp `get_visible_elements` first
+2. Raw `hideKeyboard`/`resetAccessibilityCache` with `.catch(() => {})`
+   → Use `BaseScreen.hideKeyboard()`, `resetCache()`, `ensureVisible()`
+3. `el.getLocation()` after `resetCache()` on the SAME element reference
+   → Re-query: `const fresh = await this.waitForElement(this.someGetter)`
+4. DevTools fallback for tap failures → fix the tap
+5. Hardcoded `driver.pause(N)` → use `waitUntil`/`waitForDisplayed`
+
+### ALWAYS:
+
+1. Explore screen with wdio-mcp BEFORE writing locators
+2. Locator priority: resource-id > exact content-desc > partial desc > XPath
+3. After keyboard/cache operations: `ensureVisible(element)`
+4. Re-query elements after `resetCache()`
+5. Screen detection via `getPageSource().includes()` / `detectScreen()`

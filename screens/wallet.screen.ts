@@ -1,4 +1,5 @@
 import { BaseScreen, TIMEOUTS } from './base.screen.ts';
+import { safeGetPageSource } from '../support/mobile/app-driver.ts';
 
 /**
  * WalletScreen — หน้า Wallet (bottom nav tab)
@@ -114,7 +115,7 @@ export class WalletScreen extends BaseScreen {
       //   2. 'navigation_menu_home' — fallback: bottom nav is present even when wallet
       //      data is reloading and 'Crypto Wallet' is temporarily absent from the tree.
       //      Present on ALL main-tab screens (home/wallet/scan/dapp/profile).
-      const source = await driver.getPageSource();
+      const source = await safeGetPageSource();
       return source.includes('Crypto Wallet') || source.includes('navigation_menu_home');
     } catch {
       return false;

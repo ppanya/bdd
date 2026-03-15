@@ -1,4 +1,5 @@
 import { BaseScreen, TIMEOUTS } from './base.screen.ts';
+import { safeGetPageSource } from '../support/mobile/app-driver.ts';
 
 /**
  * ProfileMenuScreen — หน้า Profile Menu (bottom nav Profile tab)
@@ -68,7 +69,7 @@ export class ProfileMenuScreen extends BaseScreen {
     try {
       // Use getPageSource() — same strategy as detectScreen() / isOnWalletScreen().
       // Not affected by UiAutomator2 "displayed" reporting degradation after heavy usage.
-      const source = await driver.getPageSource();
+      const source = await safeGetPageSource();
       return source.includes('profile_view_profile_button');
     } catch {
       return false;

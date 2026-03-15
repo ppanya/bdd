@@ -50,6 +50,31 @@ export abstract class BaseScreen {
     return el;
   }
 
+  /** Dismiss keyboard — safe no-op if already hidden */
+  async hideKeyboard(): Promise<void> {
+    try {
+      await driver.hideKeyboard();
+    } catch {
+      /* already hidden */
+    }
+  }
+
+  /** Flush UiAutomator2 accessibility cache — safe no-op on failure */
+  async resetCache(): Promise<void> {
+    try {
+      await driver.execute('mobile: resetAccessibilityCache', {});
+    } catch {
+      /* non-critical */
+    }
+  }
+
+  /** resetCache → hideKeyboard → waitForDisplayed (correct order, single call) */
+  async ensureVisible(el: ChainablePromiseElement, timeout: number = TIMEOUTS.element): Promise<void> {
+    await this.resetCache();
+    await this.hideKeyboard();
+    await el.waitForDisplayed({ timeout });
+  }
+
   /**
    * Flush UiAutomator2 accessibility cache หลัง navigation transition
    *
@@ -60,6 +85,10 @@ export abstract class BaseScreen {
   async waitForIdle(_maxWait: number = TIMEOUTS.nav) {
     try {
       await driver.execute('mobile: resetAccessibilityCache', {});
+      // Allow UiAutomator2 to finish rebuilding the accessibility tree.
+      // Without this, the first getPageSource() after DevTools navigation hangs
+      // because the tree is mid-rebuild. 300ms is sufficient for Flutter/Semantics.
+      await driver.pause(300);
     } catch {
       // not critical — next waitForElement will retry via polling anyway
     }
@@ -132,14 +161,16 @@ export abstract class BaseScreen {
     return el.isDisplayed();
   }
 
-  async scrollDown(pixels = 300) {
-    await browser
-      .action('pointer', { parameters: { pointerType: 'touch' } })
-      .move({ x: 200, y: 500 })
-      .down()
-      .move({ x: 200, y: 500 - pixels, duration: 300 })
-      .up()
-      .perform();
+  async scrollDown(percent = 0.5) {
+    const { width, height } = await driver.getWindowSize();
+    await driver.execute('mobile: scrollGesture', {
+      left: Math.round(width * 0.1),
+      top: Math.round(height * 0.2),
+      width: Math.round(width * 0.8),
+      height: Math.round(height * 0.6),
+      direction: 'down',
+      percent,
+    });
   }
 
   async swipe(startX: number, startY: number, endX: number, endY: number) {

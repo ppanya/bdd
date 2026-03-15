@@ -606,21 +606,21 @@ export class LoginScreen extends BaseScreen {
 
 Screen objects ที่มีอยู่:
 
-| File                    | หน้า                                                      |
-| ----------------------- | --------------------------------------------------------- |
-| `base.screen.ts`        | Abstract base — waitForElement, tap, scroll, swipe        |
-| `devtools.screen.ts`    | DEV TOOLS panel — inject session, navigate 61 routes      |
-| `onboarding.screen.ts`  | Welcome / onboarding screen                               |
-| `login.screen.ts`       | Email tab, Phone tab, Login button                        |
-| `pdpa.screen.ts`        | PDPA Consent — accept button                              |
-| `home.screen.ts`        | Home screen + bottom navigation bar                       |
-| `pincode.screen.ts`     | Set PIN + Confirm PIN (6-digit entry)                     |
-| `wallet.screen.ts`      | Wallet tab — Crypto/THBK tabs, Token list, quick actions  |
-| `history.screen.ts`     | Crypto History — Token/NFT/Point tabs, transaction rows   |
-| `profile-menu.screen.ts`| Profile menu — app_menu_* resource-ids, View Profile      |
-| `settings.screen.ts`    | Application Setting — Appearances, Languages              |
-| `my-profile.screen.ts`  | Profile Information — masking toggle, phone/email rows    |
-| `nft-collection.screen.ts` | NFT Collections — wallet address, empty state          |
+| File                       | หน้า                                                     |
+| -------------------------- | -------------------------------------------------------- |
+| `base.screen.ts`           | Abstract base — waitForElement, tap, scroll, swipe       |
+| `devtools.screen.ts`       | DEV TOOLS panel — inject session, navigate 61 routes     |
+| `onboarding.screen.ts`     | Welcome / onboarding screen                              |
+| `login.screen.ts`          | Email tab, Phone tab, Login button                       |
+| `pdpa.screen.ts`           | PDPA Consent — accept button                             |
+| `home.screen.ts`           | Home screen + bottom navigation bar                      |
+| `pincode.screen.ts`        | Set PIN + Confirm PIN (6-digit entry)                    |
+| `wallet.screen.ts`         | Wallet tab — Crypto/THBK tabs, Token list, quick actions |
+| `history.screen.ts`        | Crypto History — Token/NFT/Point tabs, transaction rows  |
+| `profile-menu.screen.ts`   | Profile menu — app*menu*\* resource-ids, View Profile    |
+| `settings.screen.ts`       | Application Setting — Appearances, Languages             |
+| `my-profile.screen.ts`     | Profile Information — masking toggle, phone/email rows   |
+| `nft-collection.screen.ts` | NFT Collections — wallet address, empty state            |
 
 Flutter app ต้องมี `Semantics(identifier: '...')` ครอบ widget:
 
@@ -1070,12 +1070,12 @@ adb shell settings put secure accessibility_enabled 1
 
 ### ผลที่ได้
 
-| Artifact | ที่เก็บ |
-| -------- | ------- |
-| Screenshots | `discovery/screenshots/{route}.png` |
-| Screen objects | `screens/{name}.screen.ts` |
-| Feature files | `features/mobile/{name}.feature` |
-| Step definitions | `steps/mobile/{name}.steps.ts` |
+| Artifact         | ที่เก็บ                             |
+| ---------------- | ----------------------------------- |
+| Screenshots      | `discovery/screenshots/{route}.png` |
+| Screen objects   | `screens/{name}.screen.ts`          |
+| Feature files    | `features/mobile/{name}.feature`    |
+| Step definitions | `steps/mobile/{name}.steps.ts`      |
 
 > **หมายเหตุ:** ใช้ **wdio-mcp เท่านั้น** — ห้ามใช้ appium-mcp ควบคู่ (สอง session ทำให้ UiAutomator2 crash)
 
@@ -1123,16 +1123,16 @@ await devTools.pushTo('Token Transfer');
 
 Route สำคัญแบ่งตาม auth:
 
-| กลุ่ม | Routes |
-| ----- | ------ |
-| Pre-auth | Onboarding, Login, Signup |
-| Main tabs | Home, Wallet, DApp, Scanner |
-| Consent | TOS, PDPA, Suitability Assessment |
-| Wallet | History, Point Detail, Wrapable Token |
-| Tokens | Transfer, Review, Summary, Detail |
-| NFTs | Collection, Images, Video, Import, Receive |
-| Profile | Menu, My Profile, Settings, Theme, Language |
-| Transfers | Bank, Kub, Join, Programmable, Top Up |
+| กลุ่ม     | Routes                                      |
+| --------- | ------------------------------------------- |
+| Pre-auth  | Onboarding, Login, Signup                   |
+| Main tabs | Home, Wallet, DApp, Scanner                 |
+| Consent   | TOS, PDPA, Suitability Assessment           |
+| Wallet    | History, Point Detail, Wrapable Token       |
+| Tokens    | Transfer, Review, Summary, Detail           |
+| NFTs      | Collection, Images, Video, Import, Receive  |
+| Profile   | Menu, My Profile, Settings, Theme, Language |
+| Transfers | Bank, Kub, Join, Programmable, Top Up       |
 
 ---
 
@@ -1210,27 +1210,27 @@ All scenarios must pass. If any fail, diagnose and fix before declaring done.
 
 The wallet-history case study shows why tap verification is non-negotiable:
 
-| Element | Mechanism tried | Result | Root cause |
-|---|---|---|---|
-| Transfer button | `tap_element ~Transfer` | ✅ Opens modal | Flutter modal — works with accessibility tap |
-| History button | `tap_element ~History` | ❌ Silent fail | Flutter screen-push nav blocked by TalkBack |
-| History button | `click_element ~History` | ❌ Silent fail | Same — accessibility action insufficient |
-| History button | `execute_script clickGesture` | ❌ Silent fail | Raw touch also blocked |
-| DevTools `goTo('History')` | — | ✅ Works | Direct route injection bypasses tap entirely |
+| Element                    | Mechanism tried               | Result         | Root cause                                   |
+| -------------------------- | ----------------------------- | -------------- | -------------------------------------------- |
+| Transfer button            | `tap_element ~Transfer`       | ✅ Opens modal | Flutter modal — works with accessibility tap |
+| History button             | `tap_element ~History`        | ❌ Silent fail | Flutter screen-push nav blocked by TalkBack  |
+| History button             | `click_element ~History`      | ❌ Silent fail | Same — accessibility action insufficient     |
+| History button             | `execute_script clickGesture` | ❌ Silent fail | Raw touch also blocked                       |
+| DevTools `goTo('History')` | —                             | ✅ Works       | Direct route injection bypasses tap entirely |
 
 **Result:** `When I tap the History button` step now: tries native tap → 3s `getPageSource` check → DevTools fallback if needed.
 Without Phase 3, the generated test would have used `tap_element` and failed silently every run.
 
 ### Substitution Guide
 
-| Placeholder | Example |
-|---|---|
-| `[APP_PATH]` | `apps/app-mock-release.apk` |
-| `[FEATURE_NAME]` | `Transfer flow / NFT Collection / Profile Settings` |
-| `[SCREEN]` | `Wallet / Profile Menu / Crypto History` |
-| `[ROUTE_NAME]` | `Wallet` / `Menu` / `History` (see `DevToolsRoute` in `screens/devtools.screen.ts`) |
-| `[name]` | `transfer` / `nft` / `settings` |
-| `[expected_text]` | unique string visible in `getPageSource` on that screen |
+| Placeholder       | Example                                                                             |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| `[APP_PATH]`      | `apps/app-mock-release.apk`                                                         |
+| `[FEATURE_NAME]`  | `Transfer flow / NFT Collection / Profile Settings`                                 |
+| `[SCREEN]`        | `Wallet / Profile Menu / Crypto History`                                            |
+| `[ROUTE_NAME]`    | `Wallet` / `Menu` / `History` (see `DevToolsRoute` in `screens/devtools.screen.ts`) |
+| `[name]`          | `transfer` / `nft` / `settings`                                                     |
+| `[expected_text]` | unique string visible in `getPageSource` on that screen                             |
 
 ### Quick Variant — Read-Only Screens
 
@@ -1259,12 +1259,12 @@ Tags serve **three distinct purposes**. Conflating them creates confusion. Under
 
 These trigger `Before` hooks in `fixtures/index.ts`. They control **what setup runs before each scenario**.
 
-| Tag | Hook | What it does |
-|---|---|---|
-| `@mobile` | `Before { tags: '@mobile' }` | Health check: verify Appium session is alive |
-| `@login-screen` | `Before { tags: '@login-screen' }` | Navigate to Login screen via DevTools before each scenario |
-| `@devtools` | `Before { tags: '@devtools' }` | Inject test session token via DevTools (skip if already authenticated) |
-| `@navigation` | `Before { tags: '@navigation' }` | Full login flow once per session (for navigation tests) |
+| Tag             | Hook                               | What it does                                                           |
+| --------------- | ---------------------------------- | ---------------------------------------------------------------------- |
+| `@mobile`       | `Before { tags: '@mobile' }`       | Health check: verify Appium session is alive                           |
+| `@login-screen` | `Before { tags: '@login-screen' }` | Navigate to Login screen via DevTools before each scenario             |
+| `@devtools`     | `Before { tags: '@devtools' }`     | Inject test session token via DevTools (skip if already authenticated) |
+| `@navigation`   | `Before { tags: '@navigation' }`   | Full login flow once per session (for navigation tests)                |
 
 **Rule: every mobile feature file needs `@mobile` at the top.** Add `@devtools` when the feature needs authentication. Add `@login-screen` only for login screen tests.
 
@@ -1346,11 +1346,11 @@ TAGS='@mobile and not @smoke' bun run test:mobile:android
 
 ### Complete Tag Map (current)
 
-| File | Feature-level tags | Scenario-level tags |
-|---|---|---|
-| `login.feature` | `@mobile` `@login-screen` | `@phone-disable` `@phone-enable` `@email-disable` `@email-partial` `@email-enable` `@new-user-pin` |
-| `profile.feature` | `@mobile` `@profile-screen` | `@smoke` `@profile-menu` `@profile-view-profile` `@profile-settings`* `@profile-my-profile`* |
-| `wallet.feature` | `@mobile` `@devtools` `@wallet-screen` | `@smoke` `@wallet-tabs` `@wallet-subtabs` `@wallet-actions` `@wallet-history`* |
+| File              | Feature-level tags                     | Scenario-level tags                                                                                |
+| ----------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `login.feature`   | `@mobile` `@login-screen`              | `@phone-disable` `@phone-enable` `@email-disable` `@email-partial` `@email-enable` `@new-user-pin` |
+| `profile.feature` | `@mobile` `@profile-screen`            | `@smoke` `@profile-menu` `@profile-view-profile` `@profile-settings`_ `@profile-my-profile`_       |
+| `wallet.feature`  | `@mobile` `@devtools` `@wallet-screen` | `@smoke` `@wallet-tabs` `@wallet-subtabs` `@wallet-actions` `@wallet-history`\*                    |
 
 `*` = also triggers After hook cleanup (BACK press in `fixtures/index.ts`)
 

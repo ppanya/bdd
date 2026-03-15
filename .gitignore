@@ -14,7 +14,7 @@ playwright-report/
 allure-results/
 allure-report/
 
-# Living Checklist reports (generated at runtime)
+# Reports
 reports/
 
 # Flutter app binaries (too large for git)
@@ -29,6 +29,9 @@ dist
 
 # appium-mcp local config (machine-specific paths)
 .mcp-screenshots/
+
+# Video recordings (debug artifacts — large, ephemeral)
+reports/videos/
 
 # Appium + Emulator PIDs
 .appium.pid

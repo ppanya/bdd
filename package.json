@@ -15,8 +15,10 @@
     "mock:test": "bun run mock & sleep 3 && bun run test:api; kill %1",
     "setup:m-series": "sh scripts/setup-m-series.sh",
     "setup:drivers": "bash scripts/setup-drivers.sh",
-    "report:checklist": "bun scripts/checklist-server.ts",
     "generate:bru": "bun scripts/generate-bru.ts",
+    "pretest": "rm -rf allure-results",
+    "report:generate": "bunx allure generate allure-results -o allure-report --clean",
+    "report:allure": "bunx allure serve allure-results",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -38,13 +40,13 @@
     "@wdio/spec-reporter": "^9.0.0",
     "@wdio/types": "^9.0.0",
     "appium": "^3.0.0",
-    "appium-mcp": "^1.24.1",
     "appium-uiautomator2-driver": "^7.0.0",
     "appium-xcuitest-driver": "^10.0.0",
     "expect-webdriverio": "^5.0.0",
     "prettier": "^3.8.1",
     "prettier-plugin-gherkin": "^3.1.3",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "wdio-video-reporter": "^6.2.0"
   },
   "peerDependencies": {
     "typescript": "^5"

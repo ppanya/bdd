@@ -3,8 +3,9 @@ import type { AppWorld } from '../../fixtures/index.ts';
 import { ProfileMenuScreen } from '../../screens/profile-menu.screen.ts';
 import { SettingsScreen } from '../../screens/settings.screen.ts';
 import { MyProfileScreen } from '../../screens/my-profile.screen.ts';
-import { DevToolsScreen } from '../../screens/devtools.screen.ts';
 import { TIMEOUTS } from '../../screens/base.screen.ts';
+import { ensureAuthenticated } from '../../support/mobile/session-helper.ts';
+import { navigateViaDevTools } from '../../support/mobile/nav-helper.ts';
 
 const profileMenu = new ProfileMenuScreen();
 const settings = new SettingsScreen();
@@ -13,19 +14,15 @@ const myProfile = new MyProfileScreen();
 // ── Given ─────────────────────────────────────────────────────────────────────
 
 Given('I am on the Profile Menu screen via DEV TOOLS', async function (this: AppWorld) {
-  // Skip DevTools navigation if already on the Profile Menu screen (e.g. previous
-  // scenario left us here). Avoids 16+ scroll swipes that degrade UiAutomator2.
-  // waitUntil (5s) handles transient accessibility tree refresh — same pattern as
-  // the Wallet Background step.
-  const alreadyOnProfile = await browser
-    .waitUntil(() => profileMenu.isOnProfileMenuScreen(), { timeout: 5_000, interval: 500 })
-    .catch(() => false);
-  if (alreadyOnProfile) return;
+  await ensureAuthenticated();
 
-  const devTools = new DevToolsScreen();
-  await devTools.open();
-  await devTools.goTo('Menu');
-  await profileMenu.waitForElement(profileMenu.viewProfileButton);
+  await navigateViaDevTools(
+    'Menu',
+    () => profileMenu.isOnProfileMenuScreen(),
+    async () => {
+      await profileMenu.waitForElement(profileMenu.viewProfileButton);
+    },
+  );
 });
 
 // ── Then ───────────────────────────────────────────────────────────────────────
@@ -50,7 +47,7 @@ Then('the Security menu item is visible', async function (this: AppWorld) {
   await expect(profileMenu.security).toBeDisplayed();
 });
 
-Then('I see the Application Setting screen', async function (this: AppWorld) {
+Then('I see the Appearances screen', async function (this: AppWorld) {
   // Flutter navigation animation is async — waitForElement polls until the
   // Settings screen title appears (up to TIMEOUTS.nav) before asserting.
   await settings.waitForElement(settings.title, TIMEOUTS.nav);

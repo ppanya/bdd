@@ -81,7 +81,7 @@ export class LoginScreen extends BaseScreen {
   async switchToEmailLogin() {
     const el = await this.waitForElement(this.switchToEmailButton);
     await this.tap(el);
-    await this.waitForIdle();  // Flutter view transition is async
+    await this.waitForIdle(); // Flutter view transition is async
     // goTo('Login') reuses Flutter widget — TextEditingController retains values.
     // Clear so @email-disable always starts with empty fields. No-op if already empty.
     await this.emailInput.clearValue().catch(() => {});

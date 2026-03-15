@@ -17,6 +17,7 @@
  */
 
 import { BaseScreen, TIMEOUTS } from './base.screen.ts';
+import logger from '../support/logger.ts';
 
 /**
  * All screens reachable via DEV TOOLS shortcuts.
@@ -133,6 +134,16 @@ export class DevToolsScreen extends BaseScreen {
   // Reduces total W3C pointer actions from ~432 to ~250 across 3 consecutive runs.
   private static lastRoute: string | null = null;
 
+  /** Reset route cache — call in Before hook to prevent stale fast-path across scenarios. */
+  static resetRouteCache(): void {
+    DevToolsScreen.lastRoute = null;
+  }
+
+  /** Platform helper — reusable across methods for iOS/Android branching */
+  private get isIOS(): boolean {
+    return (driver.capabilities['platformName'] as string)?.toLowerCase() === 'ios';
+  }
+
   // ── Session Injection elements ────────────────────────────────────────────────
 
   // DEV TOOLS elements have NO resource-id (Flutter Semantics does not expose them).
@@ -177,41 +188,53 @@ export class DevToolsScreen extends BaseScreen {
    */
   async open(): Promise<void> {
     // Reset accessibility cache before waiting for devtool_button.
-    // This is a targeted reset — only called when we actually need to open DevTools.
-    // It prevents stale UiAutomator2 cache from hiding devtool_button when the
-    // Wallet screen has been showing for a while (periodic crypto-data refresh can
-    // temporarily invalidate the cache without triggering a getPageSource failure).
-    await driver.execute('mobile: resetAccessibilityCache', {}).catch(() => {});
+    // Prevents stale UiAutomator2 cache from hiding devtool_button when the
+    // app screen has been showing for a while (e.g. periodic crypto-data refresh).
+    await this.resetCache();
 
-    // Wait for devtool_button before attempting the gesture.
-    // IMPORTANT: this wait is not just a readiness check — it ensures Flutter's
-    // GestureDetector is fully registered before the raw touch event is sent.
-    // Removing or softening this wait causes the doubleClickGesture to arrive before
-    // Flutter's semantic tree is built, making it silently miss the button.
-    //
-    // Callers that need to avoid DevTools (e.g. already on the target screen) should
-    // use isOnXxxScreen() + early-return BEFORE calling open(), not by bypassing this wait.
+    // Wait for devtool_button — ensures Flutter's GestureDetector is fully registered
+    // before the raw touch event is sent. Without this, doubleClickGesture silently misses.
     await this.byResourceId('devtool_button').waitForDisplayed({
       timeout: 30_000, // 30s — allows for slow wallet-screen crypto-data loading
     });
 
-    const { width, height } = await driver.getWindowSize();
+    const MAX_ATTEMPTS = 3;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const { width, height } = await driver.getWindowSize();
 
-    // devtool_button has clickable=false; needs raw touch via doubleClickGesture.
-    // Visual position: right edge ~97% width, ~78% height.
-    // Verified on Pixel 7 API 34 (1080×2337): x=1050, y=1825.
-    await driver.execute('mobile: doubleClickGesture', {
-      x: Math.round(width * 0.97),
-      y: Math.round(height * 0.78),
-    });
+      // devtool_button has clickable=false; needs raw touch via doubleClickGesture.
+      // Visual position: right edge ~97% width, ~78% height.
+      // mobile: doubleClickGesture is W3C spec — works on both UiAutomator2 and XCUITest.
+      await driver.execute('mobile: doubleClickGesture', {
+        x: Math.round(width * 0.97),
+        y: Math.round(height * 0.78),
+      });
 
-    await this.waitForIdle();
+      await this.waitForIdle();
 
-    // Confirm DEV TOOLS header is shown — use descriptionContains for safety
-    await $(`android=new UiSelector().descriptionContains("DEV TOOLS")`).waitForDisplayed({
-      timeout: TIMEOUTS.nav,
-    });
+      // Platform-aware selector for DEV TOOLS header
+      const devToolsHeader = this.isIOS
+        ? $(`~DEV TOOLS`) // accessibility id on iOS
+        : $(`android=new UiSelector().descriptionContains("DEV TOOLS")`);
 
+      const opened = await devToolsHeader
+        .waitForDisplayed({ timeout: 3_000 })
+        .then(() => true)
+        .catch(() => false);
+
+      if (opened) {
+        if (attempt > 1) logger.info(`[DevTools.open] succeeded on attempt ${attempt}`);
+        return;
+      }
+
+      logger.warn(`[DevTools.open] attempt ${attempt}/${MAX_ATTEMPTS} — header not found`);
+      if (attempt < MAX_ATTEMPTS) {
+        await this.resetCache();
+        await browser.pause(500);
+      }
+    }
+
+    throw new Error('[DevTools.open] failed after 3 attempts — DEV TOOLS header never appeared');
   }
 
   /**
@@ -220,14 +243,17 @@ export class DevToolsScreen extends BaseScreen {
    */
   async close(): Promise<void> {
     if (!(await this.isOpen())) return; // already closed — nothing to do
-    await driver.execute('mobile: pressKey', { keycode: 4 }); // Android BACK
+    await driver.back(); // WebDriver standard — BACK on Android, nav pop on iOS
     await this.waitForIdle();
   }
 
   /** Returns true if the DEV TOOLS header is currently visible. */
   async isOpen(): Promise<boolean> {
     try {
-      return await $(`android=new UiSelector().descriptionContains("DEV TOOLS")`).isDisplayed();
+      const devToolsHeader = this.isIOS
+        ? $(`~DEV TOOLS`)
+        : $(`android=new UiSelector().descriptionContains("DEV TOOLS")`);
+      return await devToolsHeader.isDisplayed();
     } catch {
       return false;
     }
@@ -323,10 +349,12 @@ export class DevToolsScreen extends BaseScreen {
    * @example await devTools.pushTo('PDPA')
    */
   async pushTo(route: DevToolsRoute): Promise<void> {
-    const btn = $(`//android.view.View[contains(@content-desc,'${route}') and contains(@content-desc,'PUSH')]`);
+    const btn = $(
+      `//android.view.View[contains(@content-desc,'${route}') and contains(@content-desc,'PUSH')]`,
+    );
 
     // Fast path: if same route as last call, element might already be visible — skip scroll reset
-    if (DevToolsScreen.lastRoute === route && await btn.isDisplayed().catch(() => false)) {
+    if (DevToolsScreen.lastRoute === route && (await btn.isDisplayed().catch(() => false))) {
       await this.tapRoute(btn);
       await this.waitForIdle();
       DevToolsScreen.lastRoute = route;
@@ -348,10 +376,12 @@ export class DevToolsScreen extends BaseScreen {
    * @example await devTools.goTo('Wallet Info')
    */
   async goTo(route: DevToolsRoute): Promise<void> {
-    const btn = $(`//android.view.View[contains(@content-desc,'${route}') and contains(@content-desc,'GO')]`);
+    const btn = $(
+      `//android.view.View[contains(@content-desc,'${route}') and contains(@content-desc,'GO')]`,
+    );
 
     // Fast path: if same route as last call, element might already be visible — skip scroll reset
-    if (DevToolsScreen.lastRoute === route && await btn.isDisplayed().catch(() => false)) {
+    if (DevToolsScreen.lastRoute === route && (await btn.isDisplayed().catch(() => false))) {
       await this.tapRoute(btn);
       await this.waitForIdle();
       DevToolsScreen.lastRoute = route;
@@ -380,37 +410,46 @@ export class DevToolsScreen extends BaseScreen {
    * Core scroll logic shared by scrollToView and the XPath-based goTo/pushTo.
    */
   private async scrollToViewByEl(el: ChainablePromiseElement, label: string): Promise<void> {
-    // Flush stale UiAutomator2 accessibility tree before scroll detection.
+    // Flush stale accessibility tree before scroll detection.
     // After multiple DevTools sessions + TalkBack interactions, el.isDisplayed() can
     // return false for visible elements due to a partially-rebuilt semantic tree.
-    // resetAccessibilityCache forces a fresh sync before we start scanning.
-    await driver.execute('mobile: resetAccessibilityCache', {}).catch(() => {});
+    await this.resetCache();
 
     if (await el.isDisplayed().catch(() => false)) return;
 
+    // Dynamic center X — works on any screen size (Android + iOS)
+    const { width } = await driver.getWindowSize();
+    const centerX = Math.round(width / 2);
+
     // Reset to top: finger sweeps downward (y 900→1800) scrolls content toward top.
     for (let i = 0; i < DevToolsScreen.RESET_SWIPES; i++) {
-      await this.swipe(540, 900, 540, 1800);
-      // 150ms pause between swipes: lets UiAutomator2 instrumentation process touch events
+      await this.swipe(centerX, 900, centerX, 1800);
+      // 150ms pause between swipes: lets instrumentation process touch events
       // before the next one arrives. Without pause, rapid swipes queue up and OOM-crash
       // the instrumentation process (socket hang up on subsequent Appium sessions).
       await browser.pause(150);
       // Flutter AccessibilityBridge updates post-frame (~16-600ms). waitUntil polls
       // every 100ms up to 800ms; .catch continues loop if not found yet.
-      await browser.waitUntil(() => el.isDisplayed().catch(() => false), {
-        timeout: 800, interval: 100,
-      }).catch(() => {});
+      await browser
+        .waitUntil(() => el.isDisplayed().catch(() => false), {
+          timeout: 800,
+          interval: 100,
+        })
+        .catch(() => {});
       if (await el.isDisplayed().catch(() => false)) return;
     }
 
     // Search downward: finger sweeps upward (y 1600→500) scrolls DevTools content down.
     for (let i = 0; i < DevToolsScreen.SEARCH_SWIPES; i++) {
       if (await el.isDisplayed().catch(() => false)) return;
-      await this.swipe(540, 1600, 540, 500);
+      await this.swipe(centerX, 1600, centerX, 500);
       await browser.pause(150);
-      await browser.waitUntil(() => el.isDisplayed().catch(() => false), {
-        timeout: 800, interval: 100,
-      }).catch(() => {});
+      await browser
+        .waitUntil(() => el.isDisplayed().catch(() => false), {
+          timeout: 800,
+          interval: 100,
+        })
+        .catch(() => {});
     }
 
     throw new Error(`DevTools: "${label}" not found after scrolling`);
@@ -421,7 +460,7 @@ export class DevToolsScreen extends BaseScreen {
    * tap() handles clickable=false Flutter GestureDetectors via platform gesture.
    */
   private async tapRoute(btn: ChainablePromiseElement): Promise<void> {
-    await this.tap(btn);  // tap() handles clickable=false via platform gesture
+    await this.tap(btn); // tap() handles clickable=false via platform gesture
   }
 
   /**
