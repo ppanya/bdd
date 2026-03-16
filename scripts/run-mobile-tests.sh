@@ -66,30 +66,58 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ── Pre-flight checks ─────────────────────────────────────────────────────────
-if ! command -v adb &>/dev/null; then
-  echo "❌ 'adb' not found. Install Android SDK platform-tools:"
-  echo "   brew install --cask android-platform-tools  OR  set ANDROID_HOME"
-  exit 1
-fi
-
 if ! command -v curl &>/dev/null; then
   echo "❌ 'curl' not found. Install it: brew install curl"
   exit 1
 fi
 
-if ! adb devices 2>/dev/null | grep -q "emulator"; then
-  echo "❌ No Android emulator connected."
-  echo "   Run first:  bun run android"
+if [[ "$PLATFORM" == "android" ]]; then
+  if ! command -v adb &>/dev/null; then
+    echo "❌ 'adb' not found. Install Android SDK platform-tools:"
+    echo "   brew install --cask android-platform-tools  OR  set ANDROID_HOME"
+    exit 1
+  fi
+
+  if ! adb devices 2>/dev/null | grep -q "emulator"; then
+    echo "❌ No Android emulator connected."
+    echo "   Run first:  bun run android"
+    exit 1
+  fi
+
+  if ! curl -sf "http://127.0.0.1:${APPIUM_PORT}/status" > /dev/null 2>&1; then
+    echo "❌ Appium not running on port $APPIUM_PORT."
+    echo "   Run first:  bun run android"
+    exit 1
+  fi
+
+  echo "✓ Emulator connected, Appium ready — launching tests..."
+
+elif [[ "$PLATFORM" == "ios" ]]; then
+  if ! command -v xcrun &>/dev/null; then
+    echo "❌ 'xcrun' not found. Install Xcode Command Line Tools:"
+    echo "   xcode-select --install"
+    exit 1
+  fi
+
+  if ! xcrun simctl list devices 2>/dev/null | grep -q "Booted"; then
+    echo "❌ No iOS simulator booted."
+    echo "   Run first:  bun run ios"
+    exit 1
+  fi
+
+  if ! curl -sf "http://127.0.0.1:${APPIUM_PORT}/status" > /dev/null 2>&1; then
+    echo "❌ Appium not running on port $APPIUM_PORT."
+    echo "   Run first:  bun run ios"
+    exit 1
+  fi
+
+  echo "✓ Simulator booted, Appium ready — launching tests..."
+
+else
+  echo "❌ Unknown platform: $PLATFORM"
+  echo "   Usage: bash scripts/run-mobile-tests.sh [android|ios]"
   exit 1
 fi
-
-if ! curl -sf "http://127.0.0.1:${APPIUM_PORT}/status" > /dev/null 2>&1; then
-  echo "❌ Appium not running on port $APPIUM_PORT."
-  echo "   Run first:  bun run android"
-  exit 1
-fi
-
-echo "✓ Emulator connected, Appium ready — launching tests..."
 
 # ── Build tag expression: merge TAGS env var + --tags arg ─────────────────────
 FINAL_TAGS="${TAGS:-}"
