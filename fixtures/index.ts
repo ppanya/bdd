@@ -92,18 +92,19 @@ AfterStep(function ({ pickleStep, result }) {
 });
 
 After(async function (this: AppWorld, scenario) {
-  // ถ่าย screenshot เมื่อ test fail — ตรวจสอบว่า session ยังมีชีวิตอยู่ก่อน
-  if (scenario.result?.status === 'FAILED') {
-    const sessionId: string | undefined =
-      typeof browser !== 'undefined' ? browser.sessionId : undefined;
-    if (sessionId) {
-      try {
-        const screenshot = await browser.takeScreenshot();
-        void this.attach(screenshot, 'image/png');
-      } catch (err) {
-        // session อาจถูกปิดไปก่อน (เช่น app crash, AVD timeout) — ไม่ต้อง throw
-        logger.warn('[After hook] screenshot skipped', { error: (err as Error).message });
-      }
+  // ถ่าย screenshot ทุก scenario บน mobile — ให้ visual proof ใน Allure ทั้ง pass และ fail
+  // Web: ถ่ายเฉพาะ fail (video reporter ดูแล pass อยู่แล้ว)
+  const isMobile = !!process.env['MOBILE_PLATFORM'];
+  const shouldCapture = isMobile || scenario.result?.status === 'FAILED';
+  const sessionId: string | undefined =
+    typeof browser !== 'undefined' ? browser.sessionId : undefined;
+  if (shouldCapture && sessionId) {
+    try {
+      const screenshot = await browser.takeScreenshot();
+      void this.attach(screenshot, 'image/png');
+    } catch (err) {
+      // session อาจถูกปิดไปก่อน (เช่น app crash, AVD timeout) — ไม่ต้อง throw
+      logger.warn('[After hook] screenshot skipped', { error: (err as Error).message });
     }
   }
 });

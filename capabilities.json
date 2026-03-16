@@ -7,5 +7,14 @@
     "appium:app": "apps/app-mock-release.apk",
     "appium:newCommandTimeout": 300,
     "appium:noReset": false
+  },
+  "ios": {
+    "platformName": "iOS",
+    "appium:automationName": "XCUITest",
+    "appium:deviceName": "<from IOS_DEVICE_NAME>",
+    "appium:platformVersion": "<from IOS_PLATFORM_VER>",
+    "appium:app": "apps/Runner.app",
+    "appium:newCommandTimeout": 300,
+    "appium:noReset": false
   }
 }

@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 // @ts-expect-error — wdio-video-reporter types exist but package.json "exports" prevents resolution
 import video from 'wdio-video-reporter';
 import logger from './support/logger.ts';
@@ -19,6 +21,53 @@ const appReady = process.env['APP_READY'] === 'true';
 // Package name for terminate/activate app (avoids reloadSession spawn errors).
 // Auto-set by bun run android (start-android-all.sh). Override via APP_PACKAGE env.
 const appPackage = process.env['APP_PACKAGE'] ?? 'com.bbt.bitkubnext.mock';
+
+// ── IPA → .app resolution ────────────────────────────────────────────────────
+// If IOS_APP_PATH points to a .ipa file, extract the .app bundle from Payload/
+// so Appium XCUITest can use it with the simulator.
+function resolveIosApp(appPath: string): string {
+  // Already a .app directory — use directly
+  if (existsSync(appPath) && statSync(appPath).isDirectory()) return appPath;
+
+  // Not a .ipa — return as-is
+  if (!appPath.endsWith('.ipa')) return appPath;
+
+  if (!existsSync(appPath)) {
+    logger.warn(`IPA not found: ${appPath} — will pass path as-is to Appium`);
+    return appPath;
+  }
+
+  const ipaDir = dirname(appPath);
+  const ipaName = basename(appPath, '.ipa');
+  const extractDir = join(ipaDir, '.ipa-extracted', ipaName);
+  const payloadDir = join(extractDir, 'Payload');
+
+  // Re-extract if cache is missing or IPA is newer
+  const needsExtract =
+    !existsSync(payloadDir) || statSync(appPath).mtimeMs > statSync(payloadDir).mtimeMs;
+
+  if (needsExtract) {
+    logger.info(`Extracting .app from IPA: ${appPath}`);
+    mkdirSync(extractDir, { recursive: true });
+    execFileSync('unzip', ['-qo', appPath, 'Payload/*.app/*', '-d', extractDir], {
+      timeout: 60_000,
+    });
+  }
+
+  // Find the .app bundle inside Payload/
+  const entries = existsSync(payloadDir)
+    ? readdirSync(payloadDir)
+    : [];
+  const appBundle = entries.find((e: string) => e.endsWith('.app'));
+  if (!appBundle) {
+    logger.warn('No .app found inside IPA Payload/ — passing original path');
+    return appPath;
+  }
+
+  const resolved = join(payloadDir, appBundle);
+  logger.info(`Resolved IPA → .app: ${resolved}`);
+  return resolved;
+}
 
 // ── capabilities ─────────────────────────────────────────────────────────────
 
@@ -49,10 +98,11 @@ const androidCapability = {
 
 const iosCapability = {
   platformName: 'iOS',
-  'appium:deviceName': 'iPhone 15',
+  'appium:deviceName': process.env['IOS_DEVICE_NAME'] ?? 'iPhone 15',
   'appium:automationName': 'XCUITest',
-  'appium:app': process.env['IOS_APP_PATH'] ?? 'apps/Runner.app',
-  'appium:platformVersion': '17.0',
+  'appium:app': resolveIosApp(process.env['IOS_APP_PATH'] ?? 'apps/Runner.app'),
+  'appium:platformVersion': process.env['IOS_PLATFORM_VER'] ?? '17.0',
+  'appium:noReset': appReady,
   // Prevent Appium from killing the session during long operations (simulator boot, slow steps)
   'appium:newCommandTimeout': 300,
 };
