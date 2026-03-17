@@ -171,9 +171,17 @@ install_app_to_simulator() {
     return 1
   fi
 
+  # Uninstall first to ensure a clean install every time
+  local bundle_id
+  bundle_id=$(extract_bundle_id "$app_path" 2>/dev/null || true)
+  if [[ -n "$bundle_id" ]]; then
+    log_ios "Uninstalling previous: $bundle_id"
+    xcrun simctl uninstall "$udid" "$bundle_id" 2>/dev/null || true
+  fi
+
   log_ios "Installing app: $app_path"
   xcrun simctl install "$udid" "$app_path"
-  ok_ios "App installed"
+  ok_ios "App installed (fresh)"
 }
 
 # ── Bundle ID extraction ────────────────────────────────────────────────────

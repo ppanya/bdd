@@ -96,11 +96,10 @@ Feature: ระบบ Login
 **สำหรับ Mobile testing (Apple Silicon):**
 
 ```bash
-# ติดตั้ง JDK, Android SDK, ARM64 emulator, Appium และ drivers
-sh scripts/setup-m-series.sh
-
-# ติดตั้ง Appium drivers (UiAutomator2, XCUITest)
-bun run setup:drivers
+# ติดตั้งทุกอย่าง: JDK, Android SDK, ARM64 emulator, Xcode, iOS Simulator, Appium drivers
+bun run setup              # interactive — เลือก Android / iOS / Both
+bun run setup:android      # Android only
+bun run setup:ios          # iOS only
 ```
 
 ---
@@ -116,11 +115,8 @@ bun install
 # 2. สร้าง environment config
 cp .env.example .env
 
-# 3. Bootstrap Apple Silicon environment (includes JDK, Android SDK, Appium, emulator)
-sh scripts/setup-m-series.sh
-
-# 4. ติดตั้ง Appium drivers (UiAutomator2, XCUITest)
-bun run setup:drivers
+# 3. Setup mobile environment (interactive — เลือก Android / iOS / Both)
+bun run setup
 ```
 
 ### Web + API Tests (No Mobile)
@@ -145,68 +141,74 @@ Spec Files:    6 passed, 6 total
 **Before running mobile tests** — prepare environment **once per session**:
 
 ```bash
-# [Terminal 1] Boot emulator + start Appium + install APK + clear data
+# [Terminal 1] Android: boot emulator + start Appium + install APK
 bun run android
-# Output: ✅ Android ready. Appium PID: 12345
+
+# [Terminal 1] iOS: boot simulator + extract .ipa → .app + install + start Appium
+bun run ios
 ```
 
-**Then run tests** (emulator + Appium จะรันอยู่ตลอด):
+**Then run tests** (emulator/simulator + Appium จะรันอยู่ตลอด):
 
 ```bash
 # [Terminal 2] รัน mobile tests
 bun run test:mobile:android
+bun run test:mobile:ios
 
 # หรือรัน feature เฉพาะ
 bun run test:mobile:android -- --feature login
-bun run test:mobile:android -- --feature navigation
+bun run test:mobile:ios -- --feature login
 ```
 
-สาเหตุการแยก `android` ออกมา:
+สาเหตุการแยก `android`/`ios` ออกจาก `test:mobile:*`:
 
-- **`android`** เปิด emulator + Appium เดียวครั้ง → ประหยัด boot time
-- **`test:mobile:android`** รัน tests ซ้ำๆ ไม่ต้อง restart environment
-- Pre-flight checks → fail fast ถ้า emulator/Appium ไม่พร้อม
+- **`android`/`ios`** เปิด emulator/simulator + Appium ครั้งเดียว → ประหยัด boot time
+- **`test:mobile:*`** รัน tests ซ้ำๆ ไม่ต้อง restart environment
+- Pre-flight checks → fail fast ถ้า emulator/simulator/Appium ไม่พร้อม
 
 ---
 
 ## Before Running Tests
 
-| Test Type  | Prerequisites                                      | Setup Script                                               |
-| ---------- | -------------------------------------------------- | ---------------------------------------------------------- |
-| **Web**    | Node.js, Chrome                                    | `bun install` ✓                                            |
-| **API**    | Node.js, Prism mock                                | `bun install` + `bun run mock` ✓                           |
-| **Mobile** | Android SDK, JDK, Appium, emulator, Appium drivers | `sh scripts/setup-m-series.sh` + `bun run setup:drivers` ✓ |
+| Test Type      | Prerequisites                                          | Setup Script             |
+| -------------- | ------------------------------------------------------ | ------------------------ |
+| **Web**        | Node.js, Chrome                                        | `bun install` ✓          |
+| **API**        | Node.js, Prism mock                                    | `bun install` + `bun run mock` ✓ |
+| **Android**    | Android SDK, JDK, Appium, emulator, UiAutomator2       | `bun run setup:android`  |
+| **iOS**        | Xcode, iOS Simulator runtime, Appium, XCUITest         | `bun run setup:ios`      |
 
 ### First-Time Setup Checklist
 
 - [ ] `bun install` — install Node + Bun dependencies
 - [ ] `cp .env.example .env` — create environment config
-- [ ] `sh scripts/setup-m-series.sh` — install Android SDK, JDK, Appium (Apple Silicon only)
-- [ ] `bun run setup:drivers` — install Appium drivers
+- [ ] `bun run setup` — setup mobile environment (Android / iOS / Both)
 
 ### Before Every Mobile Test Session
 
 ```bash
-bun run android
+# Android
+bun run android    # boot emulator + enable TalkBack + install APK + start Appium
+
+# iOS
+bun run ios        # boot simulator + extract .ipa → .app + install + start Appium
 ```
 
-Script นี้จะ:
+**`bun run android`** จะ:
 
 1. ✓ Boot emulator (ถ้ายังไม่รัน)
-2. ✓ Start Appium server
+2. ✓ Enable TalkBack (Flutter Semantics bridge)
 3. ✓ Install APK
-4. ✓ **Clear app data** — reset สถานะเป็น Onboarding
-5. ✓ Launch app
+4. ✓ Start Appium server
 
-**สำหรับ automated tests** ต้องเปิด TalkBack ด้วย (Flutter Semantics bridge):
+**`bun run ios`** จะ:
 
-```bash
-bun run emulator:test-mode   # TalkBack ON — ต้องทำก่อนรัน tests
-# หรือ
-bun run emulator:interactive # TalkBack OFF — สำหรับ manual use / wdio-mcp exploration
-```
+1. ✓ Boot simulator (ถ้ายังไม่รัน) + เปิด Simulator.app
+2. ✓ Extract `.ipa` → `.app` (ถ้า `IOS_APP_PATH` ชี้ไป `.ipa`)
+3. ✓ Uninstall + reinstall app (fresh ทุกรอบ)
+4. ✓ Extract bundle ID อัตโนมัติ
+5. ✓ Start Appium server
 
-ถ้า emulator / Appium รันอยู่แล้ว จะข้ามขั้นตอนนั้น → เร็ว
+ถ้า emulator/simulator + Appium รันอยู่แล้ว จะข้ามขั้นตอนนั้น → เร็ว
 
 ### Verify Setup
 
@@ -215,8 +217,9 @@ bun run emulator:interactive # TalkBack OFF — สำหรับ manual use / 
 bun run test:web
 bun run test:api
 
-# Mobile tests (after bun run android)
-bun run test:mobile:android
+# Mobile tests
+bun run test:mobile:android   # after bun run android
+bun run test:mobile:ios       # after bun run ios
 ```
 
 ---
@@ -311,12 +314,18 @@ bdd/
 │       └── types.ts                  # TypeScript interfaces
 │
 ├── scripts/
-│   ├── start-android.sh              # boot emulator + start Appium + install APK
+│   ├── setup.sh                      # unified setup: Android / iOS / Both (interactive)
+│   ├── start-android-all.sh          # boot emulator + enable TalkBack + install APK + start Appium
+│   ├── start-ios-all.sh              # boot simulator + extract .ipa → .app + install + start Appium
 │   ├── run-mobile-tests.sh           # pre-flight checks + run WDIO mobile suite
-│   ├── setup-m-series.sh             # bootstrap Apple Silicon environment
-│   ├── setup-drivers.sh              # install Appium drivers
-│   ├── inspect-android.sh            # open Appium Inspector (Android)
-│   └── inspect-ios.sh                # open Appium Inspector (iOS)
+│   ├── lib/
+│   │   ├── defaults.sh               # shared defaults + .env loader
+│   │   ├── common.sh                 # Android helpers (boot, TalkBack, Appium)
+│   │   ├── ios-common.sh             # iOS helpers (boot, UDID, IPA extract, install)
+│   │   ├── setup-common.sh           # shared setup (Homebrew, JDK, Bun, Node)
+│   │   ├── setup-android.sh          # Android setup (SDK, AVD, UiAutomator2)
+│   │   └── setup-ios.sh              # iOS setup (Xcode, runtime, simulator, XCUITest)
+│   └── talkback.sh                   # toggle TalkBack on/off
 │
 ├── bruno/                            # Bruno API collection
 │   ├── bruno.json
@@ -327,8 +336,8 @@ bdd/
 │   ├── history.json                  # append-only run history
 │   └── living-checklist.html         # interactive HTML report
 │
-├── apps/                             # (gitignored) APK / .app binaries
-├── capabilities.json                 # base Appium Android capabilities (wdio-mcp)
+├── apps/                             # (gitignored) APK / .ipa / .app binaries
+├── capabilities.json                 # Appium capabilities for Inspector (Android + iOS)
 ├── .mcp.json                         # wdio-mcp MCP server configuration
 ├── openapi.yaml                      # OpenAPI 3.0 spec — source of truth ของ API
 ├── wdio.conf.ts                      # WDIO configuration
@@ -392,7 +401,8 @@ TAGS='@smoke' bun run test
 TAGS='not @manual' bun run test:web
 
 # ── Mobile Environment ──────────────────────────────────────
-bun run android          # boot emulator + start Appium + install APK (ครั้งเดียวต่อ session)
+bun run android          # boot emulator + enable TalkBack + install APK + start Appium
+bun run ios              # boot simulator + extract .ipa → .app + install + start Appium
 
 # ── Mobile Test Selection ───────────────────────────────────
 # รัน feature เฉพาะ (ชื่อ หรือ path)
@@ -425,8 +435,9 @@ bun run generate:bru           # สร้าง .bru files จาก features/a
 bun run generate:bru -- --merge  # สร้าง *.merged.bru (base + override รวมกัน)
 
 # ── Setup ──────────────────────────────────────────────────
-bun run setup:m-series         # bootstrap Apple Silicon (JDK, Android SDK, Appium)
-bun run setup:drivers          # ติดตั้ง Appium drivers (UiAutomator2, XCUITest)
+bun run setup                  # unified setup: interactive (Android / iOS / Both)
+bun run setup:android          # Android only (SDK, AVD, UiAutomator2 driver)
+bun run setup:ios              # iOS only (Xcode, runtime, simulator, XCUITest driver)
 
 # ── Emulator Mode ───────────────────────────────────────────
 bun run emulator:interactive   # TalkBack OFF — ใช้ emulator ปกติ (manual / wdio-mcp)
@@ -453,9 +464,12 @@ cp .env.example .env
 | `API_BASE_URL`        | `http://localhost:4010`              | `BaseAPI` constructor                                                |
 | `MOBILE_PLATFORM`     | (unset = web)                        | กำหนด capability: `android` \| `ios`                                 |
 | `ANDROID_APP_PATH`    | `apps/app-mock-release.apk`          | Appium Android `app` capability                                      |
-| `IOS_APP_PATH`        | `apps/Runner.app`                    | Appium iOS `app` capability                                          |
-| `ANDROID_AVD`         | `Pixel_7_API_34_arm64`               | `start-android.sh` — ชื่อ AVD ที่จะ boot                             |
-| `ANDROID_APP_PACKAGE` | (unset)                              | `start-android.sh` — launch app หลัง install (optional)              |
+| `IOS_APP_PATH`        | `apps/Runner.app`                    | Appium iOS `app` capability (รองรับทั้ง `.app` และ `.ipa` — auto-extract) |
+| `IOS_DEVICE_NAME`     | (required for iOS)                   | ชื่อ iOS Simulator เช่น `iPhone 17`                                  |
+| `IOS_PLATFORM_VER`    | (required for iOS)                   | iOS version เช่น `26.3` (ใช้ major.minor ไม่ใช่ patch)              |
+| `IOS_BUNDLE_ID`       | auto-extracted from `.app`           | Bundle ID ของ iOS app                                                |
+| `ANDROID_AVD`         | `Pixel_7_API_34_arm64`               | ชื่อ AVD ที่จะ boot                                                  |
+| `APP_PACKAGE`         | auto-extracted from APK              | Android package name                                                 |
 | `APPIUM_PORT`         | `4723`                               | Appium server port                                                   |
 | `APP_READY`           | `false`                              | `true` = skip APK reinstall (set อัตโนมัติโดย `run-mobile-tests.sh`) |
 | `RELEASE_TAG`         | git branch name                      | Living Checklist report label                                        |
@@ -724,26 +738,26 @@ Mobile testing แยกออกเป็น 2 ขั้นตอนชัด�
 **ขั้น 1 — เตรียม environment (ทำครั้งเดียวต่อ session)**
 
 ```bash
+# Android
 bun run android
+
+# iOS
+bun run ios
 ```
 
-script นี้จะ:
-
-1. Boot emulator AVD (`Pixel_7_API_34_arm64`) ถ้ายังไม่รัน
-2. หยุด Appium เก่า (ถ้ามี `.appium.pid`) แล้วเริ่มใหม่ที่ port 4723
-3. รอ Appium พร้อม (poll `/status` สูงสุด 30 วินาที)
-4. เปิด Android accessibility สำหรับ Flutter Semantics bridge
-5. ติดตั้ง APK ด้วย `adb install -r`
+**`bun run android`** จะ: boot emulator → enable TalkBack → install APK → start Appium
+**`bun run ios`** จะ: boot simulator → extract `.ipa` → `.app` → install (fresh) → start Appium
 
 **ขั้น 2 — รัน tests**
 
 ```bash
 # รัน mobile suite ทั้งหมด
 bun run test:mobile:android
+bun run test:mobile:ios
 
 # รัน feature เฉพาะ (ชื่อไฟล์ ไม่ต้อง path/extension)
 bun run test:mobile:android -- --feature login
-bun run test:mobile:android -- --feature navigation
+bun run test:mobile:ios -- --feature login
 
 # รัน ด้วย full path
 bun run test:mobile:android -- --spec features/mobile/login.feature
@@ -760,11 +774,14 @@ bun run test:mobile:android -- --feature login --tags "@happy-path"
 bun run test:mobile:android -- --feature login --scenario "เข้าสู่ระบบสำเร็จ"
 ```
 
-`run-mobile-tests.sh` ทำ pre-flight checks ก่อนรัน — ถ้า emulator ไม่ได้เชื่อมต่อหรือ Appium ไม่รัน จะ fail พร้อมคำแนะนำ:
+`run-mobile-tests.sh` ทำ pre-flight checks ก่อนรัน — ถ้า emulator/simulator ไม่ได้เชื่อมต่อหรือ Appium ไม่รัน จะ fail พร้อมคำแนะนำ:
 
 ```
 ❌ No Android emulator connected.
    Run first:  bun run android
+
+❌ No iOS simulator booted.
+   Run first:  bun run ios
 ```
 
 ### APP_READY — skip reinstall + data cleared
@@ -936,7 +953,7 @@ export const config = {
 
   baseUrl: process.env['BASE_URL'] ?? 'https://the-internet.herokuapp.com',
 
-  // Appium ไม่ใช้ @wdio/appium-service — manage ด้วย start-android.sh แทน
+  // Appium ไม่ใช้ @wdio/appium-service — manage ด้วย start-android-all.sh / start-ios-all.sh แทน
   // (Appium v3 เขียน log ไปที่ stderr — service จะ fail ใน onPrepare)
   services: [],
 
@@ -1342,9 +1359,9 @@ This section is for **Claude Code** users. Claude can explore the live app, writ
 
 Before prompting, ensure:
 
-1. **Emulator is running**: `bun run android` (boots emulator + Appium + installs APK)
+1. **Emulator/Simulator is running**: `bun run android` or `bun run ios`
 2. **Appium is alive**: check with `curl http://localhost:4723/status`
-3. **TalkBack is ON**: `bun run emulator:test-mode` (required for Flutter Semantics)
+3. **TalkBack is ON** (Android only): `bun run emulator:test-mode` (required for Flutter Semantics)
 
 ### Prompt Examples by Task
 
