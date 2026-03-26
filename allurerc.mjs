@@ -1,5 +1,5 @@
 export default {
-  name: "BBT BDD Test Report",
+  name: "BDD Test Report",
   output: "./allure-report",
   historyPath: "./allure-history.jsonl",
 };

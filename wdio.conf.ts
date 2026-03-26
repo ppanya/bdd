@@ -13,6 +13,22 @@ const isArm64 = process.arch === 'arm64';
 // undefined when not explicitly set — defaults to web capability
 const mobilePlatform = process.env['MOBILE_PLATFORM'];
 
+// Named constants — one place to adjust all timeouts
+const TIMEOUTS = {
+  APPIUM_COMMAND: 300,   // seconds before Appium kills an idle session
+  FLUTTER_IDLE: 2000,    // ms — Flutter idle wait; keeps AVD boot fast
+  WAITFOR: 10_000,       // ms — WDIO default waitFor
+  ADB: 10_000,           // ms — adb shell command timeout
+  APP_RESTART: 3000,     // ms — Flutter re-init + Semantics bridge activation
+} as const;
+
+// Readable platform flags — avoids repeated `!mobilePlatform` checks inline
+const platform = {
+  isWeb: !mobilePlatform,
+  isAndroid: mobilePlatform === 'android',
+  isIos: mobilePlatform === 'ios',
+} as const;
+
 // When APP_READY=true (set by run-mobile-tests.sh), skip APK reinstall.
 // The environment was pre-warmed by start-android.sh — no need to reinstall.
 // When false/unset (CI or first run), do a full clean install.
@@ -20,7 +36,23 @@ const appReady = process.env['APP_READY'] === 'true';
 
 // Package name for terminate/activate app (avoids reloadSession spawn errors).
 // Auto-set by bun run android (start-android-all.sh). Override via APP_PACKAGE env.
-const appPackage = process.env['APP_PACKAGE'] ?? 'com.bbt.bitkubnext.mock';
+const appPackage = process.env['APP_PACKAGE'] ?? 'com.example.app';
+
+// Remote Selenium Grid for web tests in Docker / CI.
+// Parsed once here to avoid redundant URL construction in the config spread below.
+// Null when SELENIUM_REMOTE_URL is unset → WDIO launches local Chrome.
+const seleniumRemoteUrl = process.env['SELENIUM_REMOTE_URL']
+  ? new URL(process.env['SELENIUM_REMOTE_URL'])
+  : null;
+
+// Shared try/catch shape used in the `before` hook for non-fatal setup steps
+async function safeRun(label: string, fn: () => Promise<void>): Promise<void> {
+  try {
+    await fn();
+  } catch (err) {
+    logger.warn(`[before] ${label} failed`, { error: (err as Error).message });
+  }
+}
 
 // ── IPA → .app resolution ────────────────────────────────────────────────────
 // If IOS_APP_PATH points to a .ipa file, extract the .app bundle from Payload/
@@ -78,7 +110,9 @@ const webCapability = {
   },
 };
 
-const androidCapability = {
+// Record<string, unknown> so getCapabilities() can cast to WebdriverIO.Capabilities
+// without the double `as unknown as` workaround needed for string-keyed appium: fields.
+const androidCapability: Record<string, unknown> = {
   platformName: 'Android',
   'appium:deviceName': 'emulator-5554',
   'appium:automationName': 'UiAutomator2',
@@ -90,10 +124,10 @@ const androidCapability = {
   'appium:noReset': appReady,
   'appium:dontStopAppOnReset': appReady,
   // Prevent Appium from killing the session during long operations (AVD boot, slow steps)
-  'appium:newCommandTimeout': 300,
-  'appium:waitForIdleTimeout': 2000,
+  'appium:newCommandTimeout': TIMEOUTS.APPIUM_COMMAND,
   // Flutter rebuilds UI constantly — 10s default idle wait is excessive.
   // 2s is sufficient. Does NOT override waitForDisplayed() (10s timeout, independent).
+  'appium:waitForIdleTimeout': TIMEOUTS.FLUTTER_IDLE,
 };
 
 const iosCapability = {
@@ -104,13 +138,12 @@ const iosCapability = {
   'appium:platformVersion': process.env['IOS_PLATFORM_VER'] ?? '17.0',
   'appium:noReset': appReady,
   // Prevent Appium from killing the session during long operations (simulator boot, slow steps)
-  'appium:newCommandTimeout': 300,
+  'appium:newCommandTimeout': TIMEOUTS.APPIUM_COMMAND,
 };
 
 function getCapabilities(): WebdriverIO.Capabilities[] {
-  if (mobilePlatform === 'ios') return [iosCapability as WebdriverIO.Capabilities];
-  if (mobilePlatform === 'android')
-    return [androidCapability as unknown as WebdriverIO.Capabilities];
+  if (platform.isIos) return [iosCapability as WebdriverIO.Capabilities];
+  if (platform.isAndroid) return [androidCapability as WebdriverIO.Capabilities];
   return [webCapability];
 }
 
@@ -155,7 +188,7 @@ export const config: WebdriverIO.Config = {
   cucumberOpts: {
     require: [
       './fixtures/index.ts',
-      ...(mobilePlatform ? ['./fixtures/mobile.hooks.ts'] : []),
+      ...(platform.isWeb ? [] : ['./fixtures/mobile.hooks.ts']),
       './steps/**/*.ts',
     ],
     timeout: 60_000,
@@ -180,47 +213,44 @@ export const config: WebdriverIO.Config = {
   // Video reporter disabled for mobile — rapid Appium screenshots cause
   // "socket hang up" crashes (wdio-video-reporter takes screenshots via
   // the same WebDriver session, overwhelming the Appium connection).
-  reporters: [
-    'spec',
-    [
-      'allure',
-      {
-        outputDir: 'allure-results',
-        disableWebdriverStepsReporting: true,
-        disableWebdriverScreenshotsReporting: false,
-      },
-    ],
-    ...(!mobilePlatform
-      ? ([
-          [
-            video,
-            {
-              saveAllVideos: false, // only save videos for failed tests
-              videoSlowdownMultiplier: 3, // 3x slower playback for review
-              outputDir: 'reports/videos',
-            },
-          ],
-        ] as WebdriverIO.Config['reporters'])
-      : []),
-  ],
+  reporters: (() => {
+    const list: WebdriverIO.Config['reporters'] = [
+      'spec',
+      ['allure', { outputDir: process.env['ALLURE_RESULTS_DIR'] ?? 'allure-results', disableWebdriverStepsReporting: true, disableWebdriverScreenshotsReporting: false }],
+    ];
+    if (platform.isWeb) {
+      list.push([video, { saveAllVideos: false, videoSlowdownMultiplier: 3, outputDir: 'reports/videos' }] as never);
+    }
+    return list;
+  })(),
 
-  // ── Appium connection (mobile suites) ─────────────────────────────────────
-  // Appium must be running before WDIO starts. Default port 4723.
-  // Override with APPIUM_PORT env var (e.g. APPIUM_PORT=4724 bun run test:mobile:android)
-  ...(mobilePlatform
+  // ── Connection overrides ───────────────────────────────────────────────────
+  // Mobile → Appium (local); Web + SELENIUM_REMOTE_URL → remote Selenium Grid.
+  // No overrides → WDIO launches Chrome locally (default).
+  ...((platform.isAndroid || platform.isIos)
     ? {
-        hostname: '127.0.0.1',
+        // Appium must be running before WDIO starts. Default port 4723.
+        // Override with APPIUM_PORT env var (e.g. APPIUM_PORT=4724 bun run test:mobile:android)
+        hostname: process.env['APPIUM_HOST'] ?? '127.0.0.1',
         port: parseInt(process.env['APPIUM_PORT'] ?? '4723', 10),
         path: '/',
       }
-    : {}),
+    : seleniumRemoteUrl
+      ? {
+          // Docker / CI: route web tests through remote Selenium Grid
+          hostname: seleniumRemoteUrl.hostname,
+          port: parseInt(seleniumRemoteUrl.port || '4444', 10),
+          path: '/wd/hub',
+          protocol: 'http' as const,
+        }
+      : {}),
 
   // ── Base URL (web suite) ───────────────────────────────────────────────────
   // browser.url('/login') resolves against this — required for relative URLs
   baseUrl: process.env['BASE_URL'] ?? 'https://the-internet.herokuapp.com',
 
   // ── Timeouts ───────────────────────────────────────────────────────────────
-  waitforTimeout: 10_000,
+  waitforTimeout: TIMEOUTS.WAITFOR,
   connectionRetryTimeout: 120_000,
   connectionRetryCount: 3,
 
@@ -230,8 +260,8 @@ export const config: WebdriverIO.Config = {
     process.env['WDIO_RUN_ID'] = randomUUID();
 
     const cap = Array.isArray(capabilities) ? capabilities[0] : capabilities;
-    const platform = (cap as Record<string, unknown>)?.['platformName'] ?? 'web';
-    logger.info('WDIO run', { platform });
+    const platformName = (cap as Record<string, unknown>)?.['platformName'] ?? 'web';
+    logger.info('WDIO run', { platform: platformName });
   },
 
   // Enable Android accessibility so Flutter builds its Semantics tree.
@@ -242,47 +272,43 @@ export const config: WebdriverIO.Config = {
   // Uses execFileSync (no shell spawn) + terminate/activateApp (no reloadSession)
   // to avoid spawn errors and onboarding flakiness.
   async before(_capabilities, _specs) {
-    if (mobilePlatform === 'android') {
+    if (platform.isAndroid) {
       // ── Accessibility setup (first run / CI only) ──────────────────────────
+      // Enable TalkBack so Flutter builds its Semantics tree — UIAutomator2
+      // cannot see Flutter widgets without it.
+      // Skipped when APP_READY=true: start-android-all.sh already did this.
       if (!appReady) {
         const androidHome =
           process.env['ANDROID_HOME'] ?? `${process.env['HOME']}/Library/Android/sdk`;
         const adb = `${androidHome}/platform-tools/adb`;
-        try {
+        await safeRun('accessibility setup', async () => {
           execFileSync(
             adb,
             [
-              'shell',
-              'settings',
-              'put',
-              'secure',
+              'shell', 'settings', 'put', 'secure',
               'enabled_accessibility_services',
               'com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService',
             ],
-            { stdio: 'ignore', timeout: 10_000 },
+            { stdio: 'ignore', timeout: TIMEOUTS.ADB },
           );
           execFileSync(adb, ['shell', 'settings', 'put', 'secure', 'accessibility_enabled', '1'], {
             stdio: 'ignore',
-            timeout: 10_000,
+            timeout: TIMEOUTS.ADB,
           });
-        } catch (err) {
-          logger.warn('[before] accessibility setup failed', { error: (err as Error).message });
-        }
+        });
       }
 
-      // ── Fix FM-1: App state reset at WDIO session start ───────────────────
+      // ── App state reset at WDIO session start ─────────────────────────────
       // Always restart the app at the beginning of a new WDIO session.
       // Previous run may have left the app on any sub-screen (Settings, History, etc.)
       // which would cause detectScreen() to return 'loading' and cascade failures.
       // Safe here because instrumentation is freshly initialized at session start.
-      try {
+      await safeRun('app restart', async () => {
         await driver.terminateApp(appPackage);
         await driver.pause(1000);
         await driver.activateApp(appPackage);
-        await driver.pause(3000); // Flutter re-init + Semantics bridge activation
-      } catch (err) {
-        logger.warn('[before] app restart failed', { error: (err as Error).message });
-      }
+        await driver.pause(TIMEOUTS.APP_RESTART); // Flutter re-init + Semantics bridge activation
+      });
     }
   },
 

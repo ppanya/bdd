@@ -1,7 +1,9 @@
 # BDD Automation Framework
 
 Framework สำหรับ **Behavior-Driven Development (BDD)** ครอบคลุม Web UI, API, และ Mobile (Flutter/Native)
-ภายใต้ runner เดียว พร้อม mock server, API collection, และ living checklist report
+ภายใต้ runner เดียว พร้อม mock server และ Allure report
+
+> **เริ่มต้นเร็ว**: [docs/QUICKSTART.md](docs/QUICKSTART.md) · [docs/docker-ci-strategy.md](docs/docker-ci-strategy.md)
 
 ---
 
@@ -23,7 +25,6 @@ Framework สำหรับ **Behavior-Driven Development (BDD)** ครอบ�
 14. [Mobile Testing](#mobile-testing)
 15. [Cucumber World](#cucumber-world)
 16. [Mock API ด้วย Prism](#mock-api-ด้วย-prism)
-17. [Bruno API Collection](#bruno-api-collection)
 18. [Living Checklist Reporter](#living-checklist-reporter)
 19. [Config Files อธิบาย](#config-files-อธิบาย)
 20. [ดู Test Results](#ดู-test-results)
@@ -75,7 +76,6 @@ Feature: ระบบ Login
 | API automation    | `BaseAPI` (global `fetch`)                                                                                                  | ไม่ต้องเปิด browser          |
 | Mobile automation | [Appium v3](https://appium.io) + UIAutomator2 / XCUITest                                                                    | Flutter via Semantics bridge |
 | API mock          | [Prism](https://stoplight.io/open-source/prism)                                                                             | อ่าน `openapi.yaml`          |
-| API client (GUI)  | [Bruno](https://www.usebruno.com)                                                                                           | Git-friendly, `.bru` files   |
 | Reports           | Allure + Living Checklist (custom)                                                                                          | release-based history        |
 | Runtime (scripts) | [Bun](https://bun.sh)                                                                                                       | install, utilities, Prism    |
 | Formatter         | [Prettier](https://prettier.io) + gherkin plugin                                                                            | `.ts` + `.feature`           |
@@ -90,7 +90,6 @@ Feature: ระบบ Login
 | ------------------------------------------------- | ------------------------------------------------------ |
 | [Node.js](https://nodejs.org) ≥ 18                | `brew install node`                                    |
 | [Bun](https://bun.sh) ≥ 1.0                       | `brew install bun`                                     |
-| [Bruno](https://www.usebruno.com) (GUI, optional) | ดาวน์โหลดจาก usebruno.com                              |
 | Chrome / Chromium                                 | มีอยู่แล้วบน macOS หรือ `brew install --cask chromium` |
 
 **สำหรับ Mobile testing (Apple Silicon):**
@@ -266,17 +265,17 @@ bdd/
 │   ├── web/
 │   │   └── login.feature             # Web UI scenarios
 │   ├── api/
-│   │   └── users.feature             # API scenarios
+│   │   └── (empty — copy from examples/users-api/features/api/)
 │   └── mobile/
-│       └── login.feature             # Login flow (Email tab, PDPA consent, PIN)
+│       └── (empty — copy from examples/kub-wallet/features/mobile/)
 │
 ├── steps/                            # ② Step definitions — เชื่อม Gherkin กับ code
 │   ├── web/
-│   │   └── login.steps.ts
+│   │   └── (empty)
 │   ├── api/
-│   │   └── users.steps.ts
+│   │   └── (empty — copy from examples/users-api/steps/api/)
 │   └── mobile/
-│       └── login.steps.ts
+│       └── (empty — copy from examples/kub-wallet/steps/mobile/)
 │
 ├── pages/                            # ③ Page Objects (Web) — WDIO $() selectors
 │   └── login.page.ts
@@ -302,7 +301,7 @@ bdd/
 │   ├── env.config.ts                 # centralised env var access
 │   ├── mobile-gestures.ts            # reusable Appium gesture helpers
 │   ├── context-switcher.ts           # native ↔ webview context switching
-│   └── logger.ts                     # Winston logger (debug output)
+│   └── logger.ts                     # console logger (info/warn/error)
 │
 ├── discovery/                        # AI-generated screen catalog (auto-created)
 │   └── screenshots/                  # per-route screenshots from wdio-mcp discovery
@@ -327,11 +326,6 @@ bdd/
 │   │   └── setup-ios.sh              # iOS setup (Xcode, runtime, simulator, XCUITest)
 │   └── talkback.sh                   # toggle TalkBack on/off
 │
-├── bruno/                            # Bruno API collection
-│   ├── bruno.json
-│   ├── environments/
-│   └── users/                        # auto-generated จาก generate:bru
-│
 ├── reports/                          # (gitignored) Living Checklist output
 │   ├── history.json                  # append-only run history
 │   └── living-checklist.html         # interactive HTML report
@@ -345,43 +339,6 @@ bdd/
 ├── .env                              # (gitignored) ค่าจริง — copy จาก .env.example
 ├── .env.example
 └── package.json
-```
-
----
-
-## Workflow การทำงาน
-
-```
-┌─────────────────────────────────────────────┐
-│  1. เขียน Feature (.feature)                 │
-│     ภาษา Gherkin ที่ทุกคนเข้าใจ              │
-└────────────────────┬────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────┐
-│  2. เขียน Step Definitions (.steps.ts)       │
-│     import { Given, When, Then }             │
-│     from '@cucumber/cucumber'                │
-└────────────────────┬────────────────────────┘
-                     │
-        ┌────────────┴─────────────┐
-        │                          │
-┌───────▼────────┐      ┌──────────▼──────────┐
-│  Web/Mobile    │      │  API                 │
-│  Page/Screen   │      │  BaseAPI (fetch)     │
-│  browser/$()   │      │  ไม่ต้องเปิด browser │
-└───────┬────────┘      └──────────┬──────────┘
-        │                          │
-        └────────────┬─────────────┘
-                     │
-┌────────────────────▼────────────────────────┐
-│  3. รัน: bun run test                        │
-│     bunx wdio run wdio.conf.ts               │
-└────────────────────┬────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────┐
-│  4. ดู Results                               │
-│     spec reporter + Allure + Living Checklist│
-└─────────────────────────────────────────────┘
 ```
 
 ---
@@ -428,11 +385,11 @@ bun run mock                   # เริ่ม Prism mock ที่ port 4010
 bun run mock:test              # Prism + API tests + kill Prism (one-liner)
 
 # ── Reports ────────────────────────────────────────────────
-bun run report:checklist       # เปิด Living Checklist HTML (ต้องรัน test ก่อน)
-
-# ── Bruno ──────────────────────────────────────────────────
-bun run generate:bru           # สร้าง .bru files จาก features/api/
-bun run generate:bru -- --merge  # สร้าง *.merged.bru (base + override รวมกัน)
+bun run report:generate        # generate Allure report จาก allure-results/
+bun run report:api             # generate จาก allure-results-api/
+bun run report:mobile          # generate จาก allure-results-mobile/
+bun run report:all             # combine API + mobile results
+bun run report:allure          # เปิด Allure report ที่ http://localhost:4040
 
 # ── Setup ──────────────────────────────────────────────────
 bun run setup                  # unified setup: interactive (Android / iOS / Both)
@@ -672,15 +629,6 @@ Screen objects ที่มีอยู่:
 | `my-profile.screen.ts`     | Profile Information — masking toggle, phone/email rows   |
 | `nft-collection.screen.ts` | NFT Collections — wallet address, empty state            |
 
-Flutter app ต้องมี `Semantics(identifier: '...')` ครอบ widget:
-
-```dart
-Semantics(
-  identifier: 'login_email_field',  // → UIAutomator2: ~login_email_field
-  child: TextField(...),
-)
-```
-
 ---
 
 ## API Testing
@@ -714,112 +662,6 @@ Scenario: ดึง user ที่ไม่มีอยู่ ควรได้
 ```
 
 > เมื่อ switch ไป real API ลบ `Given ทดสอบ error case...` ออกได้เลย
-
----
-
-## Mobile Testing
-
-### Architecture
-
-```
-Flutter App → Semantics(identifier: '...')
-                        ↓
-              Android: content-desc   iOS: accessibilityIdentifier
-                        ↓
-              Appium UIAutomator2 / XCUITest
-                        ↓
-              WDIO $('~identifier') selector
-```
-
-### Workflow ปกติ
-
-Mobile testing แยกออกเป็น 2 ขั้นตอนชัดเจน:
-
-**ขั้น 1 — เตรียม environment (ทำครั้งเดียวต่อ session)**
-
-```bash
-# Android
-bun run android
-
-# iOS
-bun run ios
-```
-
-**`bun run android`** จะ: boot emulator → enable TalkBack → install APK → start Appium
-**`bun run ios`** จะ: boot simulator → extract `.ipa` → `.app` → install (fresh) → start Appium
-
-**ขั้น 2 — รัน tests**
-
-```bash
-# รัน mobile suite ทั้งหมด
-bun run test:mobile:android
-bun run test:mobile:ios
-
-# รัน feature เฉพาะ (ชื่อไฟล์ ไม่ต้อง path/extension)
-bun run test:mobile:android -- --feature login
-bun run test:mobile:ios -- --feature login
-
-# รัน ด้วย full path
-bun run test:mobile:android -- --spec features/mobile/login.feature
-
-# รัน scenario เฉพาะ (partial match กับชื่อ scenario)
-bun run test:mobile:android -- --scenario "กรอก email และ password"
-
-# รัน ด้วย Cucumber tag
-bun run test:mobile:android -- --tags @smoke
-TAGS='@smoke' bun run test:mobile:android
-
-# รวม filter
-bun run test:mobile:android -- --feature login --tags "@happy-path"
-bun run test:mobile:android -- --feature login --scenario "เข้าสู่ระบบสำเร็จ"
-```
-
-`run-mobile-tests.sh` ทำ pre-flight checks ก่อนรัน — ถ้า emulator/simulator ไม่ได้เชื่อมต่อหรือ Appium ไม่รัน จะ fail พร้อมคำแนะนำ:
-
-```
-❌ No Android emulator connected.
-   Run first:  bun run android
-
-❌ No iOS simulator booted.
-   Run first:  bun run ios
-```
-
-### APP_READY — skip reinstall + data cleared
-
-`run-mobile-tests.sh` ตั้ง `APP_READY=true` อัตโนมัติ → WDIO ข้ามการ reinstall APK
-(เพราะ `android` ติดตั้ง + clear data ให้แล้ว):
-
-**ผลข้าง ๆ**:
-
-- `adb install -r` ตั้ง `noReset: true` → เร็ว ไม่ต้อง reinstall
-- `pm clear <package>` ใน `android` → ทุกครั้ง reset app state → tests เริ่มจาก Onboarding เสมอ
-- ไม่มี stale data จากรอบ test ก่อนหน้า
-
-```bash
-# Force full reinstall (สำหรับ CI หรือเมื่อ APK เปลี่ยน)
-APP_READY=false bun run test:mobile:android
-```
-
-### Capability ที่ใช้
-
-| ค่า              | Android                     | iOS                |
-| ---------------- | --------------------------- | ------------------ |
-| `automationName` | `UiAutomator2`              | `XCUITest`         |
-| `app`            | `apps/app-mock-release.apk` | `apps/Runner.app`  |
-| `avd`            | `Pixel_7_API_34_arm64`      | —                  |
-| selector         | `$('~identifier')`          | `$('~identifier')` |
-
-### Appium Inspector
-
-ใช้ inspect UI element บน emulator ที่รันอยู่ — เปิด Appium Inspector app แล้วตั้งค่า:
-
-```
-Remote Host: localhost
-Remote Port: 4723
-Desired Capabilities: (copy จาก capabilities.json ที่ project root)
-```
-
-> หรือใช้ **wdio-mcp** ใน Claude Code แทน Appium Inspector (เร็วกว่า, ไม่ต้องเปิด app):
 
 ---
 
@@ -860,7 +702,6 @@ bun run mock
 
 ```
 openapi.yaml ──► Prism mock (port 4010) ──► API tests
-                                       ──► Bruno (manual explore)
 ```
 
 | สถานการณ์         | ตั้งค่า                                               |
@@ -871,53 +712,21 @@ openapi.yaml ──► Prism mock (port 4010) ──► API tests
 
 ---
 
-## Bruno API Collection
+## Allure Report
 
-### เปิด Collection
-
-1. เปิด Bruno app → **Open Collection** → เลือกโฟลเดอร์ `bruno/`
-2. เลือก environment: **local** (Prism) หรือ **staging**
-3. ส่ง request ได้เลย
-
-### Auto-generate + Override System
+Rich HTML report พร้อม screenshots, step timeline, environment info, และ historical trends.
 
 ```bash
-bun run generate:bru          # สร้าง base .bru files จาก features/api/
-bun run generate:bru -- --merge  # สร้าง *.merged.bru = base + override
-```
-
-Override system:
-
-```
-bruno/users/
-├── 01-get-api-users-200.bru          ← auto-generated (ถูก overwrite ได้)
-├── 01-get-api-users-200.override.bru ← manual edits (NEVER overwritten)
-└── 01-get-api-users-200.merged.bru   ← debug only (--merge flag)
-```
-
-แก้ไขแค่ `*.override.bru` — script จะไม่แตะ override files เลย
-
----
-
-## Living Checklist Reporter
-
-Custom WDIO reporter ที่ track test history ข้าม releases:
-
-```bash
-# รันพร้อม tag release
+# ใช้ RELEASE_TAG เพื่อ label ใน report
 RELEASE_TAG=v1.2.0 bun run test
 
-# เปิด report
-bun run report:checklist
+# Generate และดู report
+bun run report:generate    # จาก allure-results/ (web tests)
+bun run report:api         # จาก allure-results-api/
+bun run report:mobile      # จาก allure-results-mobile/
+bun run report:all         # รวม API + mobile
+bun run report:allure      # เปิด report ที่ http://localhost:4040
 ```
-
-**Features:**
-
-- **Release selector** — เลือกดู release ไหนก็ได้จาก history
-- **Trend chart** — กราฟ automated vs manual ข้าม releases
-- **`@manual` tag** — แสดงเป็น interactive checkbox (เก็บไว้ใน localStorage)
-- **Compare mode** — diff สอง releases (new/removed/changed scenarios)
-- **Export** — Markdown หรือ JSON
 
 **ค่า RELEASE_TAG:**
 
@@ -927,65 +736,6 @@ RELEASE_TAG=sprint-23 bun run test   # sprint
 RELEASE_TAG=hotfix-auth bun run test # branch/feature
 # ถ้าไม่ระบุ → ใช้ git branch name อัตโนมัติ
 ```
-
----
-
-## Config Files อธิบาย
-
-### `wdio.conf.ts`
-
-```typescript
-export const config = {
-  specs: ['./features/**/*.feature'],
-
-  suites: {
-    web:    ['./features/web/**/*.feature'],
-    api:    ['./features/api/**/*.feature'],
-    mobile: ['./features/mobile/**/*.feature'],
-  },
-
-  framework: '@wdio/cucumber-framework',
-  cucumberOpts: {
-    require: ['./fixtures/index.ts', './steps/**/*.ts'],
-    timeout: 60_000,
-    tagExpression: process.env['TAGS'], // TAGS='@smoke' กรอง scenario
-  },
-
-  baseUrl: process.env['BASE_URL'] ?? 'https://the-internet.herokuapp.com',
-
-  // Appium ไม่ใช้ @wdio/appium-service — manage ด้วย start-android-all.sh / start-ios-all.sh แทน
-  // (Appium v3 เขียน log ไปที่ stderr — service จะ fail ใน onPrepare)
-  services: [],
-
-  reporters: ['spec', 'allure', [LivingChecklistReporter, { ... }]],
-};
-```
-
-**APP_READY flag:**
-
-```typescript
-// APP_READY=true → noReset: true, dontStopAppOnReset: true
-// APP_READY=false (default) → full clean install
-const appReady = process.env['APP_READY'] === 'true';
-```
-
-**เลือก suite:**
-
-```bash
-bun run test:web              # WDIO --suite web
-bun run test:api              # WDIO --suite api
-bun run test:mobile:android   # MOBILE_PLATFORM=android + APP_READY=true + --suite mobile
-```
-
-### `tsconfig.json`
-
-| Option                 | ค่า                            | ผลกระทบ                                 |
-| ---------------------- | ------------------------------ | --------------------------------------- |
-| `strict`               | `true`                         | TypeScript strict mode ทั้งหมด          |
-| `moduleResolution`     | `"bundler"`                    | ใช้กับ Bun scripts                      |
-| `verbatimModuleSyntax` | `true`                         | type-only imports ต้องใช้ `import type` |
-| `types`                | `["@wdio/globals/types", ...]` | `browser`, `$`, `$$` เป็น globals       |
-| `ts-node.esm`          | `true`                         | WDIO โหลด config/steps ผ่าน ts-node ESM |
 
 ---
 
@@ -1044,22 +794,15 @@ Screenshots are auto-attached to Allure report via `disableWebdriverScreenshotsR
 - Videos saved to `reports/videos/` (only failed tests, 3x slowdown for review)
 - Automatically included in Allure report for web test runs
 
-### Living Checklist
-
-Interactive HTML report for release sign-off — compare releases, check off manual items, export results.
+### All Reports
 
 ```bash
-# Generate and serve Living Checklist
-bun run report:checklist
-# Output: reports/living-checklist.html — open in browser
+bun run report:generate    # web tests (allure-results/)
+bun run report:api         # API tests (allure-results-api/)
+bun run report:mobile      # mobile tests (allure-results-mobile/)
+bun run report:all         # รวม API + mobile ใน report เดียว
+bun run report:allure      # เปิด report ที่ http://localhost:4040
 ```
-
-**Features:**
-
-- Release comparison (diff between test runs)
-- Manual checkboxes for human verification items
-- Export to PDF/HTML for stakeholder sharing
-- Auto-save progress via local server
 
 ---
 
@@ -1092,12 +835,9 @@ bun run test:web
 touch features/api/products.feature
 
 # 3. step definitions ทั่วไป (GET, POST, status check)
-#    มีอยู่แล้วใน users.steps.ts — ใช้ร่วมกันได้เลย
+#    ดู reusable step patterns ใน examples/users-api/steps/api/
 
-# 4. Generate Bruno collection
-bun run generate:bru
-
-# 5. รัน
+# 4. รัน
 bun run test:api
 ```
 
@@ -1423,62 +1163,22 @@ The @email-enable test is flaky — investigate and fix.
 
 ## Tag Strategy
 
-### Why So Many Tags?
+Tags have 3 layers. Each mobile feature file needs all 3.
 
-Tags serve **three distinct purposes**. Conflating them creates confusion. Understanding the three layers explains every tag in the codebase.
+**Layer 1 — Hooks (Feature-level):** trigger `Before`/`After` hooks in `fixtures/index.ts`
 
-### The 3 Layers
+| Tag             | What it does |
+| --------------- | ------------ |
+| `@mobile`       | Health-check Appium session — **required on every mobile feature** |
+| `@devtools`     | Inject session token via DevTools (add when feature needs auth) |
+| `@login-screen` | Navigate to Login screen before each scenario |
+| `@navigation`   | Full login flow once per session |
 
-#### Layer 1 — Environment Tags (Feature-level)
+**Layer 2 — Screen scope (Feature-level):** one per file, used for filtering (`@wallet-screen`, `@profile-screen`, etc.)
 
-These trigger `Before` hooks in `fixtures/index.ts`. They control **what setup runs before each scenario**.
+**Layer 3 — Scenario tags:** `@smoke`, `@happy-path`, `@negative`, domain tag (e.g. `@wallet-tabs`). Max 2 per scenario.
 
-| Tag             | Hook                               | What it does                                                           |
-| --------------- | ---------------------------------- | ---------------------------------------------------------------------- |
-| `@mobile`       | `Before { tags: '@mobile' }`       | Health check: verify Appium session is alive                           |
-| `@login-screen` | `Before { tags: '@login-screen' }` | Navigate to Login screen via DevTools before each scenario             |
-| `@devtools`     | `Before { tags: '@devtools' }`     | Inject test session token via DevTools (skip if already authenticated) |
-| `@navigation`   | `Before { tags: '@navigation' }`   | Full login flow once per session (for navigation tests)                |
-
-**Rule: every mobile feature file needs `@mobile` at the top.** Add `@devtools` when the feature needs authentication. Add `@login-screen` only for login screen tests.
-
-#### Layer 2 — Screen Scope Tags (Feature-level)
-
-One per feature file. Identifies which screen is being tested — used for filtering runs.
-
-```
-@wallet-screen    →  features/mobile/wallet.feature
-@profile-screen   →  features/mobile/profile.feature
-@login-screen     →  features/mobile/login.feature  (doubles as Layer 1)
-```
-
-**Rule: one `@{screen}-screen` tag per feature file.**
-
-#### Layer 3 — Scenario Tags (Scenario-level)
-
-Two sub-types:
-
-**3a. Domain tags** — describe what is being tested. Used for selective runs.
-
-```
-@smoke            — critical path scenario (must always pass, run in CI)
-@wallet-tabs      — tests wallet tab switching
-@wallet-history   — tests History navigation
-@profile-settings — tests Settings navigation
-@phone-enable     — tests phone input enables submit button
-```
-
-**3b. Cleanup tags** — trigger `After` hooks that press BACK after sub-screen navigation.
-
-```
-@wallet-history       ┐
-@profile-settings     ├── After hook: BACK press + activateApp
-@profile-my-profile   ┘   (fixtures/index.ts lines 304–319)
-```
-
-These are identical to domain tags — the same tag serves both purposes.
-
-**Rule: any scenario that navigates TO a sub-screen must have a tag that matches the After hook filter.**
+> Cleanup note: scenarios that navigate to a sub-screen need a domain tag that matches the `After` hook filter in `fixtures/index.ts` (e.g. `@wallet-history`, `@profile-settings`).
 
 ### Decision Tree for New Tags
 

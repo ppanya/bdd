@@ -1,0 +1,57 @@
+services:
+  # Chrome for web tests
+  # seleniarm/standalone-chromium = ARM64-native (Apple Silicon)
+  # On x86_64 Linux CI use: selenium/standalone-chrome:latest
+  chrome:
+    image: seleniarm/standalone-chromium:latest
+    ports:
+      - "4444:4444"
+      - "7900:7900" # noVNC live view: http://localhost:7900  password: secret
+    shm_size: 2g
+    environment:
+      - SE_NODE_MAX_SESSIONS=1
+      - SE_SESSION_REQUEST_TIMEOUT=300
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4444/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Prism mock server for API tests
+  # platform: linux/amd64 — stoplight/prism has no ARM64 image; runs via Rosetta on Apple Silicon
+  # IMPORTANT: Place your openapi.yaml at the project root before running `bun run docker:up`.
+  # Copy from examples/users-api/openapi.yaml as a starting point, then adapt to your API.
+  prism-mock:
+    image: stoplight/prism:latest
+    platform: linux/amd64
+    command: mock /app/openapi.yaml --host 0.0.0.0 --port 4010
+    ports:
+      - "4010:4010"
+    volumes:
+      - ./openapi.yaml:/app/openapi.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4010"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # Test runner — ephemeral, started by docker:test:* scripts and exits when done
+  # oven/bun:1 includes Bun + Node 22 — no custom Dockerfile needed
+  test-runner:
+    image: oven/bun:1
+    working_dir: /app
+    volumes:
+      - .:/app # live project files
+      - node_modules:/app/node_modules # cached deps (populate via docker:install)
+    environment:
+      - SELENIUM_REMOTE_URL=http://chrome:4444
+      - API_BASE_URL=http://prism-mock:4010
+      - BASE_URL=${BASE_URL:-https://the-internet.herokuapp.com}
+      - TAGS # pass-through from host when set (e.g. TAGS='@smoke')
+      - SCENARIO_NAME # pass-through from host when set (e.g. SCENARIO_NAME="Login")
+      - SPEC # pass-through from host when set (e.g. SPEC=features/ui/login.feature)
+
+volumes:
+  node_modules: # named volume — persists bun install results between runs

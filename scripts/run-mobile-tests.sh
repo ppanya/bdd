@@ -140,7 +140,7 @@ if [ -n "$SCENARIO_NAME" ]; then
 fi
 
 # ── Run WDIO ──────────────────────────────────────────────────────────────────
-CMD="MOBILE_PLATFORM=$PLATFORM APPIUM_PORT=$APPIUM_PORT APP_READY=${APP_READY:-true} TAGS=$FINAL_TAGS bunx wdio run wdio.conf.ts ${WDIO_ARGS[*]+"${WDIO_ARGS[*]}"}"
+CMD="MOBILE_PLATFORM=$PLATFORM APPIUM_PORT=$APPIUM_PORT APP_READY=${APP_READY:-true} TAGS=$FINAL_TAGS ALLURE_RESULTS_DIR=${ALLURE_RESULTS_DIR:-allure-results-mobile} bunx wdio run wdio.conf.ts ${WDIO_ARGS[*]+"${WDIO_ARGS[*]}"}"
 
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "🔍 Dry run — would execute:"
@@ -152,4 +152,5 @@ MOBILE_PLATFORM="$PLATFORM" \
 APPIUM_PORT="$APPIUM_PORT" \
 APP_READY="${APP_READY:-true}" \
 TAGS="$FINAL_TAGS" \
+ALLURE_RESULTS_DIR="${ALLURE_RESULTS_DIR:-allure-results-mobile}" \
   bunx wdio run wdio.conf.ts ${WDIO_ARGS[@]+"${WDIO_ARGS[@]}"}

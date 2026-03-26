@@ -1,37 +1,24 @@
 /**
- * support/logger.ts — Winston-based structured logger
+ * support/logger.ts — lightweight structured logger
  *
  * Usage:
  *   import logger from '../support/logger.ts';
  *   logger.info('step executed', { scenario: 'login' });
- *   logger.error('step failed', { error: err.message });
- *
- * Output:
- *   - Console: colored by level
- *   - File: logs/test.log (JSON, appended)
+ *   logger.warn('session unstable', { error: err.message });
  */
 
-import { createLogger, format, transports } from 'winston';
+type Meta = Record<string, unknown>;
 
-const { combine, timestamp, printf, colorize, errors } = format;
+function fmt(level: string, msg: string, meta?: Meta): string {
+  const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const metaStr = meta && Object.keys(meta).length ? ' ' + JSON.stringify(meta) : '';
+  return `[${ts}] ${level}: ${msg}${metaStr}`;
+}
 
-const consoleFormat = printf(({ level, message, timestamp: ts, ...meta }) => {
-  const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
-  return `[${ts}] ${level}: ${message}${metaStr}`;
-});
-
-const logger = createLogger({
-  level: process.env['LOG_LEVEL'] ?? 'info',
-  format: combine(errors({ stack: true }), timestamp({ format: 'YYYY-MM-DD HH:mm:ss' })),
-  transports: [
-    new transports.Console({
-      format: combine(colorize(), consoleFormat),
-    }),
-    new transports.File({
-      filename: 'logs/test.log',
-      format: combine(timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), format.json()),
-    }),
-  ],
-});
+export const logger = {
+  info:  (msg: string, meta?: Meta) => console.log(fmt('info',  msg, meta)),
+  warn:  (msg: string, meta?: Meta) => console.warn(fmt('warn',  msg, meta)),
+  error: (msg: string, meta?: Meta) => console.error(fmt('error', msg, meta)),
+};
 
 export default logger;

@@ -18,7 +18,6 @@
 
 import { Before, After } from '@cucumber/cucumber';
 import type { AppWorld } from './index.ts';
-import { DevToolsScreen } from '../screens/devtools.screen.ts';
 import logger from '../support/logger.ts';
 
 // ── Platform-aware app identifier ─────────────────────────────────────────────
@@ -31,17 +30,14 @@ import logger from '../support/logger.ts';
 function getAppId(): string {
   const platform = (driver.capabilities['platformName'] as string)?.toLowerCase();
   if (platform === 'ios') {
-    return process.env['IOS_BUNDLE_ID'] ?? 'com.bbt.bitkubnext.mock';
+    return process.env['IOS_BUNDLE_ID'] ?? 'com.example.app';
   }
-  return process.env['APP_PACKAGE'] ?? 'com.bbt.bitkubnext.mock';
+  return process.env['APP_PACKAGE'] ?? 'com.example.app';
 }
 
 // ── Lightweight cache reset + route cache — every mobile scenario ─────────────
 
 Before(async function (this: AppWorld) {
-  // Reset DevTools route cache — prevents stale fast-path from previous scenario
-  DevToolsScreen.resetRouteCache();
-
   try {
     // Flush stale accessibility tree and give UiAutomator2 time to fully rebuild.
     // 1s pause (vs 300ms in waitForIdle) ensures the tree is stable after
