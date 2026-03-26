@@ -20,6 +20,10 @@ reports/
 # Flutter app binaries (too large for git)
 apps/
 
+# OpenAPI spec at project root — project-specific, not part of the template
+# Copy from examples/users-api/openapi.yaml and adapt to your API
+/openapi.yaml
+
 
 # Build / output
 out

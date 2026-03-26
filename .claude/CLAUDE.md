@@ -1,38 +1,72 @@
-# Project: BDD Framework (WDIO + Cucumber + Appium + Flutter)
+# Project: BDD Framework (WDIO + Cucumber + Appium)
 
 ## Runtime
 
 - **Install / scripts**: `bun install`, `bun run <script>`, `bun <file>`
-- **Test runner**: `npx wdio` (Node) — WDIO internals require Node's module loader
+- **Test runner**: `bunx wdio` (Node) — WDIO internals require Node's module loader
 - Bun auto-loads `.env` — no dotenv needed for Bun scripts
 - `bunx` = npx for one-off tools (e.g. Prism)
 
 ## Test Runner
 
-- **`bun run test`** → `npx wdio run wdio.conf.ts` (all suites)
-- **`bun run test:web`** → UI tests only
-- **`bun run test:api`** → API tests only (no browser)
+Chrome + Prism run in Docker. Test runner runs locally (fast) or fully in Docker (CI).
+
+### Local Dev (fast feedback)
+
+- **`bun run docker:up`** → start Chrome + Prism (keep running during dev session)
+- **`bun run mock`** → start Prism mock server only (local, no Docker)
+- **`bun run test:web`** → web UI tests, test runner runs locally
+- **`bun run test:api`** → API tests, test runner runs locally
+- **`bun run test`** → both suites
+
+### Docker (fully isolated — CI or reproducible run)
+
+- **`bun run docker:test:web`** → web UI tests (Chrome stays up between runs)
+- **`bun run docker:test:api`** → API tests (Prism stays up between runs)
+- **`bun run docker:test`** → both suites
+- **`bun run docker:report`** → clean run of both suites + generate Allure report
+- **`bun run docker:down`** → stop all containers (end of session)
+
+### Filtering (while services are up)
+
+- `TAGS='@smoke' bun run test:web` — filter by tag
+- `SPEC=features/ui/login.feature bun run test:web` — specific feature file
+- `SCENARIO_NAME="Login" bun run test:api` — filter by scenario name
+
+### Mobile (local only)
+
 - **`bun run test:mobile:android`** / **`bun run test:mobile:ios`** → Appium + Flutter
-- **`bun run mock`** → start Prism mock on :4010 before API tests
-- **`bun run mock:test`** → Prism + API tests in one command
-- **`bun run report:allure`** → serve Allure report locally (auto-opens browser)
+
+### Reports
+
+- **`bun run report:allure`** → open Allure report at http://localhost:4040
 - **`bun run report:generate`** → build static HTML at `allure-report/` for sharing
+- **`bun run report:api`** → generate report from API test results only
+- **`bun run report:mobile`** → generate report from mobile test results only
+- **`bun run report:all`** → combine API + mobile results into one report
 
 ## Architecture
 
 ```
-features/      # Gherkin .feature files (unchanged, Thai Gherkin)
+features/      # Gherkin .feature files
   api/         # API scenarios
-  ui/          # Web UI scenarios
-  mobile/      # Flutter mobile scenarios
+  web/         # Web UI scenarios
+  mobile/      # Mobile app scenarios
 steps/         # Step definitions (WDIO Cucumber style)
-pages/         # Page Objects (WDIO $() selectors)
-screens/       # Screen Objects (Appium + Flutter ValueKey)
+pages/         # Page Objects (WDIO $() selectors) — web tests
+screens/       # Screen Objects (Appium) — mobile tests
+  base.screen.ts   # Base class — extend for all screen objects
 fixtures/      # Cucumber World class + hooks
-support/api/   # BaseAPI (global fetch, no browser)
-scripts/       # Dev utilities
-openapi.yaml   # Prism mock spec
-wdio.conf.ts   # WDIO configuration (conditional video reporter: web only)
+support/
+  api/         # BaseAPI (global fetch, no browser)
+  mobile/      # Mobile utilities (screen detection, session helpers)
+  logger.ts    # Structured JSON logger
+scripts/       # Dev utilities (run-mobile-tests.sh, talkback.sh, lib/)
+openapi.yaml   # Prism mock spec — place at project root (gitignored)
+wdio.conf.ts   # WDIO configuration
+examples/      # Reference implementations — copy & adapt for your project
+  kub-wallet/  # Flutter mobile app + wallet API example
+  users-api/   # Generic REST API example
 ```
 
 ## Critical Rules
@@ -62,15 +96,16 @@ wdio.conf.ts   # WDIO configuration (conditional video reporter: web only)
 
 ### Screen Objects (Mobile)
 
-- Extend `BaseScreen` (screens/base.screen.ts)
-- Flutter elements: `this.flutterByKey('valuekey_name')` → `flutter=key("name")`
-- Requires `automationName: FlutterIntegration` in Appium capability
+- Extend `BaseScreen` (`screens/base.screen.ts`)
+- Locator priority: `byResourceId()` > `byId()` > `byDesc()` > XPath
+- NEVER guess locators — discover via wdio-mcp `get_visible_elements` first
 
 ### API Tests
 
 - Use `BaseAPI` from `support/api/base-api.ts` (global fetch, no browser)
 - API suite runs without launching browser at all
 - baseURL from `API_BASE_URL` env var (default: http://localhost:4010)
+- Place `openapi.yaml` at project root before running API tests
 
 ### URLs
 
@@ -84,127 +119,17 @@ wdio.conf.ts   # WDIO configuration (conditional video reporter: web only)
 
 Two hooks capture screenshots — redundancy ensures capture even when sessions crash:
 
-1. **`afterTest`** in `wdio.conf.ts` — WDIO hook, wrapped in try/catch (session may be closed)
+1. **`afterTest`** in `wdio.conf.ts` — WDIO hook, wrapped in try/catch
 2. **`After`** in `fixtures/index.ts` — Cucumber hook, checks session health before capture
 
-Both auto-attach to Allure report (`disableWebdriverScreenshotsReporting: false`).
+Both auto-attach to Allure report.
 
 ### Video Recording (Web Only)
 
-`wdio-video-reporter` is conditionally loaded — **disabled when `MOBILE_PLATFORM` is set**. Mobile Appium sessions crash with "socket hang up" when the video reporter takes rapid screenshots through the same WebDriver connection.
+`wdio-video-reporter` is conditionally loaded — **disabled when `MOBILE_PLATFORM` is set**.
 
-- Web tests: videos saved to `reports/videos/` (failed tests only, 3x slowdown)
+- Web tests: videos saved to `reports/videos/` (failed tests only)
 - Mobile tests: screenshots only (no video)
-
-### Report Commands
-
-- **`bun run report:allure`** → serve Allure report locally (auto-opens browser)
-- **`bun run report:generate`** → build static HTML at `allure-report/` for sharing
-- **`bun run report:checklist`** → Living Checklist with release comparison + manual checkboxes
-
-## Common Mistakes to Avoid
-
-- `bun test` returns "no tests found" — use `bun run test`
-- Using arrow functions `() =>` in step defs → `this` is undefined — use `function`
-- Missing `bun run mock` before API tests → ECONNREFUSED
-- `browser` global not available in API steps — use `BaseAPI` (global fetch)
-- Mobile tests need Appium running — use `--suite mobile` only with emulator/device connected
-
-## Mobile App Inspection (wdio-mcp only)
-
-**Use wdio-mcp ONLY** — never use appium-mcp alongside it (two sessions crash UiAutomator2).
-
-### Capabilities for start_app_session
-
-```
-platform: Android
-deviceName: Pixel_7_API_34_arm64
-automationName: UiAutomator2
-appiumHost: localhost
-appiumPort: 4723
-noReset: true
-capabilities: { "appium:app": "<absolute path>/apps/app-mock-release.apk" }
-```
-
-### Open DevTools
-
-```
-execute_script: "mobile: doubleClickGesture"
-args: [{ "x": 1050, "y": 1825 }]   # Pixel 7 API 34: width*0.97, height*0.78
-```
-
-### Navigate DevTools Routes
-
-**Use `click_element` only** — tap_element / clickGesture / coordinate taps do not work on route buttons.
-
-```
-# 1. Open DevTools (doubleClickGesture above)
-# 2. Scroll toward target section
-execute_script: "mobile: scrollGesture"
-  args: [{"left": 0, "top": 400, "width": 720, "height": 1400, "direction": "down", "percent": 1.5}]
-
-# 3. Click route with XPath matching both route name AND GO/PUSH
-click_element:
-  selector: //android.view.View[contains(@content-desc,'Wallet') and contains(@content-desc,'GO')]
-  scrollToView: true
-  timeout: 10000
-```
-
-Why two XPath conditions: route buttons have content-desc `emoji\nRouteName\nGO/PUSH`. The Navigator Launchpad header contains all section names, so `descriptionContains("Wallet")` matches the header first. The `and contains(@content-desc,'GO')` narrows to the actual button.
-
-Scroll depth guide (percent from top):
-
-- Onboarding/Main: 1.5x · Auth/Guard/Wallet: 2x · Token/NFTs/Home: 2.5–3x
-- Profile/Withdrawal/Pincode: 3–3.5x · Consent/THBK/Bank/Redemption: 4–5x
-
-Full route map: `memory/feedback_devtools_navigation.md`
-
-### Locator Priority
-
-1. Resource-id → `byResourceId('xxx')` (most reliable)
-2. Content-desc → `byDesc('partial text')` or `byId('exact text')`
-3. XPath → last resort
-
-## The One Prompt
-
-All tool calls use `mcp__wdio-mcp__*` (server defined in `.mcp.json`).
-
-```
-Open [APP_PATH] on Android emulator and test [FEATURE_NAME]:
-
-Phase 1 — Setup
-  mcp__wdio-mcp__start_app_session:
-    platform:Android  deviceName:Pixel_7_API_34_arm64  automationName:UiAutomator2
-    appiumHost:localhost  appiumPort:4723  noReset:true
-    capabilities: {"appium:app":"<abs-path>/[APP_PATH]"}
-  Open DevTools: execute_script "mobile: doubleClickGesture" args:[{"x":1050,"y":1825}]
-  Scroll to section: execute_script "mobile: scrollGesture" args:[{...,"percent":2}]
-  Navigate: click_element
-    selector: //android.view.View[contains(@content-desc,'[ROUTE]') and contains(@content-desc,'GO')]
-    scrollToView:true  timeout:10000
-  mcp__wdio-mcp__take_screenshot → confirm correct screen
-
-Phase 2 — Explore
-  mcp__wdio-mcp__get_visible_elements → catalog locators + clickable attributes
-  mcp__wdio-mcp__scroll if needed, repeat get_visible_elements
-
-Phase 3 — Verify interactions (CRITICAL — do not skip)
-  For each interactive element:
-    mcp__wdio-mcp__click_element → take_screenshot → works?
-    else mcp__wdio-mcp__tap_element → take_screenshot
-    else mcp__wdio-mcp__execute_script "mobile: clickGesture" args:[{"x":X,"y":Y}]
-    verify nav: execute_script "mobile: getPageSource" → includes '[expected_text]'
-
-Phase 4 — Generate
-  screens/[name].screen.ts        — extend BaseScreen, getters, isOn[Name]Screen()
-  features/mobile/[name].feature  — @smoke/@regression + @happy-path/@negative
-  steps/mobile/[name].steps.ts    — function keyword, this: AppWorld
-  Given steps: call ensureAuthenticated() + DevTools navigation
-  Use ensureVisible() after keyboard/cache operations
-
-Phase 5 — Verify
-  TAGS='@smoke' bun run test:mobile:android — all must pass
-```
 
 ## Tag Glossary
 
@@ -212,7 +137,7 @@ Tags classify scenarios by priority and type. Max 2 tags per scenario.
 
 Platform separation by command, not tags:
 
-- `bun run test:web` → `features/ui/**`
+- `bun run test:web` → `features/web/**`
 - `bun run test:api` → `features/api/**`
 - `bun run test:mobile:android` → `features/mobile/**`
 
@@ -234,94 +159,72 @@ Platform separation by command, not tags:
 
 ## Prompt: Write Mobile Test
 
-### Phase 0 — Explore Screen (REQUIRED before writing code)
+> Use this prompt for generating new mobile test code. Always explore before writing.
 
-Use wdio-mcp to discover real locators from the live app. NEVER guess element IDs.
+### Phase 0 — Explore Screen (REQUIRED)
 
-1. Start app session:
-   `mcp__wdio-mcp__start_app_session` (Android, UiAutomator2, Pixel_7_API_34_arm64)
+Use wdio-mcp to discover real locators. NEVER guess element IDs.
 
-2. Navigate to target screen:
-   - Open DevTools: `execute_script "mobile: doubleClickGesture"` args:[{"x":1050,"y":1825}]
-   - Scroll + `click_element` to target route
-
-3. Catalog all elements:
-   `mcp__wdio-mcp__get_visible_elements` → record every element's:
+1. Start app session: `mcp__wdio-mcp__start_app_session`
+2. Navigate to target screen
+3. Catalog all elements via `mcp__wdio-mcp__get_visible_elements`:
    - resource-id (most reliable)
-   - content-desc (compound text with \n separators)
-   - class name (android.widget.Button vs android.view.View)
-   - clickable attribute (true/false)
-   - Scroll down and repeat until all elements cataloged
+   - content-desc (may be compound with `\n`)
+   - class name (Button vs View)
+   - clickable attribute
 
-4. Build locator map — choose strategy per element:
+4. Build locator map:
 
-   | Priority | Strategy             | When to use                          | Example                                                |
-   | -------- | -------------------- | ------------------------------------ | ------------------------------------------------------ |
-   | 1 (best) | `byResourceId('id')` | Element has resource-id              | `byResourceId('login_submit_button')`                  |
-   | 2        | `byId('exact text')` | Unique exact content-desc            | `byId('Crypto Wallet')`                                |
-   | 3        | `byDesc('partial')`  | Compound content-desc with \n        | `byDesc('navigation_menu_wallet')`                     |
-   | 4 (last) | XPath                | No id, no desc, or need class filter | `$('//android.widget.Button[@content-desc="Accept"]')` |
+   | Priority | Strategy             | When to use                          |
+   | -------- | -------------------- | ------------------------------------ |
+   | 1 (best) | `byResourceId('id')` | Element has resource-id              |
+   | 2        | `byId('exact text')` | Unique exact content-desc            |
+   | 3        | `byDesc('partial')`  | Compound content-desc with `\n`      |
+   | 4 (last) | XPath                | No id/desc, or need class filter     |
 
-   Rules:
-   - NEVER use XPath when resource-id exists
-   - NEVER guess locators — every locator must come from get_visible_elements output
-   - For buttons with clickable=false: note in screen object (tap() handles via clickGesture)
-   - For compound content-desc: use byDesc with the stable part (before first \n)
+5. Verify each interactive element: click → screenshot → confirm state change
 
-5. Verify interactions — for each interactive element:
-   `mcp__wdio-mcp__click_element` → `take_screenshot` → confirm navigation/state change
-   If click fails: try `tap_element` → then `execute_script "mobile: clickGesture"`
+### Phase 1 — Screen Object
 
-### Phase 1 — Generate Screen Object
-
-`screens/[name].screen.ts` — extend BaseScreen:
-
+`screens/[name].screen.ts` — extend `BaseScreen`:
 - Typed getters using locators from Phase 0
-- `isOn[Name]Screen()` method using `getPageSource().includes()`
+- `isOn[Name]Screen()` using `getPageSource().includes()`
 - Action methods (fill, tap, switch)
 
-### Phase 2 — Generate Feature File
+### Phase 2 — Feature File
 
 `features/mobile/[name].feature`:
-
 - Tags: `@smoke`/`@regression` + `@happy-path`/`@negative`/`@boundary`
 - Max 2 tags per scenario
-- Background step calls `Given "I am on [Screen] via DEV TOOLS"`
 - One assertion per Then step
 
-### Phase 3 — Generate Step Definitions
+### Phase 3 — Step Definitions
 
 `steps/mobile/[name].steps.ts`:
-
 - `function` keyword (never arrows) for `this: AppWorld`
-- Given steps: call `ensureAuthenticated()` + DevTools navigation
+- Use `ensureAuthenticated()` from `support/mobile/session-helper.ts`
 - Use `ensureVisible()` after cache/keyboard operations
 - Re-query elements after `resetCache()`
-- No DevTools fallback for tap failures
-- No hardcoded `driver.pause()`
+- No hardcoded `driver.pause()` — use `waitUntil`/`waitForDisplayed`
 
 ### Phase 4 — Verify
 
 ```bash
-TAGS='@smoke' bun run test:mobile:android — all must pass
+TAGS='@smoke' bun run test:mobile:android
 ```
 
 ## Prompt: Write API Test
 
 Context:
-
 - BaseAPI from `support/api/base-api.ts` (global fetch, no browser)
-- Mock server: Prism on localhost:4010 (from openapi.yaml)
-- Existing convention: Thai Gherkin steps
+- Mock server: Prism on localhost:4010 (from `openapi.yaml`)
 - Error simulation: `Given ทดสอบ error case ด้วย status {int}` sets Prefer header
 
 Generate:
-
 1. `features/api/[name].feature` — `@smoke`/`@regression` + `@happy-path`/`@negative`
 2. `steps/api/[name].steps.ts` — reuse existing When/Then steps if applicable
 
-Reusable steps (from `steps/api/users.steps.ts`):
-
+Reusable step patterns (see `examples/users-api/steps/api/`):
 - `When ฉันเรียก GET {string}`
 - `When ฉันเรียก POST {string} ด้วย: [DataTable]`
 - `Then status code ควรเป็น {int}`
@@ -329,48 +232,30 @@ Reusable steps (from `steps/api/users.steps.ts`):
 - `Then response ควรมี field {string}`
 
 Rules:
-
 - NEVER hardcode base URL — use `API_BASE_URL` env var
 - One scenario per behavior (success, each error case)
 - Check status, response shape, and field presence
 
-## Prompt: Write Web Test
-
-Context:
-
-- Page Object: `pages/[name].page.ts` (WDIO getter pattern, no constructor)
-- Selectors: WDIO `$()` / `$$()` — CSS/ID selectors, NOT Playwright
-- `browser` and `$` are WDIO globals — no injection needed
-- Steps use `function` keyword for `this: AppWorld`
-
-Generate:
-
-1. `pages/[name].page.ts` — WDIO getters, action methods
-2. `features/ui/[name].feature` — `@smoke`/`@regression` + `@happy-path`/`@negative`
-3. `steps/web/[name].steps.ts` — `function` keyword, `this: AppWorld`
-
-Rules:
-
-- NEVER hardcode URLs — `browser.url('/path')`, baseUrl from `.env`
-- Use `$()` selectors, NOT Playwright Locator/Page types
-- Page Objects: lazy getters, no constructor injection
-
 ## Mobile Test Anti-Flakiness Rules
 
 ### NEVER:
-
-1. Guess locators — always discover via wdio-mcp `get_visible_elements` first
-2. Raw `hideKeyboard`/`resetAccessibilityCache` with `.catch(() => {})`
-   → Use `BaseScreen.hideKeyboard()`, `resetCache()`, `ensureVisible()`
-3. `el.getLocation()` after `resetCache()` on the SAME element reference
-   → Re-query: `const fresh = await this.waitForElement(this.someGetter)`
-4. DevTools fallback for tap failures → fix the tap
-5. Hardcoded `driver.pause(N)` → use `waitUntil`/`waitForDisplayed`
+1. Guess locators — always use wdio-mcp `get_visible_elements` first
+2. Call raw `hideKeyboard`/`resetAccessibilityCache` with `.catch(() => {})` — use `BaseScreen` methods
+3. Call `el.getLocation()` on the same element reference after `resetCache()` — re-query first
+4. Use hardcoded `driver.pause(N)` — use `waitUntil`/`waitForDisplayed`
 
 ### ALWAYS:
-
-1. Explore screen with wdio-mcp BEFORE writing locators
+1. Explore screen with wdio-mcp BEFORE writing any locators
 2. Locator priority: resource-id > exact content-desc > partial desc > XPath
 3. After keyboard/cache operations: `ensureVisible(element)`
 4. Re-query elements after `resetCache()`
 5. Screen detection via `getPageSource().includes()` / `detectScreen()`
+
+## Common Mistakes
+
+- `bun test` returns "no tests found" — use `bun run test`
+- Arrow functions `() =>` in step defs → `this` is undefined — use `function`
+- `bun run mock` or `bun run docker:up` required before API tests → ECONNREFUSED
+- `browser` global not available in API steps — use `BaseAPI`
+- Mobile tests need Appium running — use `--suite mobile` only with emulator/device connected
+- `openapi.yaml` must exist at project root for Prism (gitignored — copy from `examples/users-api/`)

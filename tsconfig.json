@@ -1,34 +1,61 @@
 {
   "compilerOptions": {
-    // Environment setup & latest features
-    "lib": ["ESNext"],
-    "target": "ESNext",
+    // ── Target ──────────────────────────────────────────────────────────────
+    // ES2022: frozen spec, fully supported by Node 18+ LTS and Bun.
+    // More stable than ESNext (which changes definition each year).
+    "lib": ["ES2022"],
+    "target": "ES2022",
     "module": "ESNext",
     "moduleDetection": "force",
     "allowJs": true,
 
-    // Module resolution — bundler mode for source files
+    // ── Module resolution — bundler mode for Bun source files ────────────────
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
     "noEmit": true,
 
-    // WDIO + Cucumber global types
+    // ── WDIO + Cucumber global types ─────────────────────────────────────────
     "types": ["@wdio/globals/types", "expect-webdriverio", "node", "@wdio/cucumber-framework"],
 
-    // Best practices
+    // ── Strict checking ───────────────────────────────────────────────────────
     "strict": true,
     "skipLibCheck": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // ── Rigor flags ───────────────────────────────────────────────────────────
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
+    "noImplicitReturns": true,
 
-    // Some stricter flags (disabled by default)
+    // ── Dev convenience (test framework — steps often have unused params) ─────
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
   },
-  // ts-node ESM config — used when WDIO loads wdio.conf.ts and step files via Node
+
+  // ── File scope ──────────────────────────────────────────────────────────────
+  "include": [
+    "*.ts",
+    "features/**/*.ts",
+    "steps/**/*.ts",
+    "screens/**/*.ts",
+    "support/**/*.ts",
+    "fixtures/**/*.ts",
+    "pages/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "allure-results",
+    "allure-report",
+    "reports",
+    "scripts"
+  ],
+
+  // ── ts-node ESM config — used when WDIO loads wdio.conf.ts via Node ─────────
   "ts-node": {
     "esm": true,
     "experimentalSpecifierResolution": "node",
